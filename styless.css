@@ -218,6 +218,49 @@ body { overflow-x: hidden; }
 
 /* Cart refinements */
 .cart-drawer { box-shadow: -10px 0 30px rgba(10,10,10,.12); }
+.sold-out-label { background: #6b6256; }
+.sold-out-button, .modal-add:disabled { background: #e0d8c9; border-color: #b8ad9c; color: #6b6256; cursor: not-allowed; }
+.admin-page { background: #f7f1e6; min-height: 100vh; }
+.admin-shell { margin: 0 auto; max-width: 1180px; padding: 42px 5vw 70px; }
+.admin-header { align-items: end; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 22px; }
+.admin-header-actions { align-items: center; display: flex; gap: 18px; }
+.admin-logout { background: transparent; border: 0; color: var(--muted); cursor: pointer; }
+.admin-footer-link { color: var(--accent); font-size: 11px; margin: 4px 0; }
+.admin-login-page { align-items: center; display: flex; justify-content: center; }
+.admin-login-shell { max-width: 470px; padding: 28px; width: 100%; }
+.admin-login-panel { background: var(--paper); border: 1px solid var(--line); padding: 42px; }
+.admin-login-panel h1 { font-size: clamp(48px, 8vw, 72px); }
+.admin-login-copy { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 14px 0 28px; }
+.admin-login-error { color: #a34e3e; font-size: 11px; min-height: 14px; }
+.admin-login-panel > .admin-link { display: inline-block; margin-top: 20px; }
+.admin-header h1 { font-size: clamp(42px, 6vw, 76px); }
+.admin-header p { color: var(--muted); font-size: 13px; margin: 12px 0 0; max-width: 470px; }
+.admin-link { border-bottom: 1px solid var(--accent); font-size: 12px; padding-bottom: 6px; }
+.admin-layout { display: grid; gap: 28px; grid-template-columns: minmax(280px, 360px) 1fr; }
+.admin-panel { background: var(--paper); border: 1px solid var(--line); padding: 24px; }
+.admin-panel h2 { font-size: 30px; margin-bottom: 20px; }
+.admin-form { display: grid; gap: 15px; }
+.admin-form label { color: var(--muted); display: grid; font-size: 10px; gap: 7px; letter-spacing: .08em; text-transform: uppercase; }
+.admin-form input, .admin-form select, .admin-form textarea { background: #fffaf0; border: 1px solid #cdbd9c; border-radius: 2px; color: var(--ink); font: inherit; font-size: 13px; padding: 11px; width: 100%; }
+.admin-form textarea { min-height: 78px; resize: vertical; }
+.admin-form input:focus, .admin-form select:focus, .admin-form textarea:focus { border-color: var(--accent); outline: 2px solid rgba(201,151,46,.2); }
+.admin-checks { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.admin-checks label, .availability-toggle { align-items: center; display: flex; flex-direction: row; gap: 7px; letter-spacing: 0; text-transform: none; }
+.admin-checks input, .availability-toggle input { accent-color: var(--accent); width: auto; }
+.admin-actions { display: flex; gap: 10px; margin-top: 5px; }
+.admin-primary, .admin-secondary, .admin-danger { border: 1px solid var(--ink); font-size: 11px; padding: 12px 14px; }
+.admin-primary { background: var(--accent); border-color: var(--accent); color: white; flex: 1; }
+.admin-secondary { background: transparent; }
+.admin-danger { background: transparent; border-color: #a34e3e; color: #a34e3e; }
+.admin-status { color: #4f7657; font-size: 11px; min-height: 14px; }
+.admin-list { display: grid; gap: 12px; }
+.admin-item { align-items: center; background: var(--paper); border: 1px solid var(--line); display: grid; gap: 14px; grid-template-columns: 1fr auto auto; padding: 16px; }
+.admin-item h3 { font-size: 15px; margin: 0 0 5px; }
+.admin-item p { color: var(--muted); font-size: 11px; margin: 0; }
+.admin-item-meta { color: var(--muted); font-size: 11px; text-align: right; }
+.admin-item-meta strong { color: var(--ink); display: block; font-size: 13px; margin-bottom: 5px; }
+.admin-empty { border: 1px dashed #cdbd9c; color: var(--muted); font-size: 13px; padding: 28px; text-align: center; }
+@media (max-width: 760px) { .admin-header { align-items: start; flex-direction: column; gap: 18px; } .admin-layout { grid-template-columns: 1fr; } .admin-item { align-items: start; grid-template-columns: 1fr auto; } .admin-item-meta { grid-column: 1 / -1; text-align: left; } }
 .cart-drawer-header { border-bottom-color: var(--accent); }
 .cart-items { margin: 8px -8px; padding: 0 8px; }
 .cart-item { background: #fffaf0; border: 1px solid rgba(216,181,106,.65); border-left: 3px solid var(--accent); margin: 10px 0; padding: 16px 12px; transition: transform .2s, box-shadow .2s; }

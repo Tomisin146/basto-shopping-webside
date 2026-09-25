@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Basto inventory administration">
+    <title>Basto Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styless.css">
+</head>
+<body class="admin-page">
+    <main class="admin-shell">
+        <header class="admin-header">
+            <div>
+                <p class="eyebrow">BASTO / inventory</p>
+                <h1>Manage products.</h1>
+                <p>Add products to a category, describe what is available, and mark individual items sold out whenever stock changes.</p>
+            </div>
+            <div class="admin-header-actions"><a class="admin-link" href="index.html">View storefront <span aria-hidden="true">-></span></a><button class="admin-link admin-logout" id="admin-logout" type="button">Log out</button></div>
+        </header>
+
+        <div class="admin-layout">
+            <section class="admin-panel" aria-labelledby="product-form-title">
+                <h2 id="product-form-title">Add an item</h2>
+                <form class="admin-form" id="product-form">
+                    <input type="hidden" id="product-id">
+                    <label for="product-name">Item name<input id="product-name" required type="text" placeholder="e.g. Linen resort shirt"></label>
+                    <label for="product-category">Category<select id="product-category" required>
+                        <option value="tops">Tops</option>
+                        <option value="pants">Pants</option>
+                        <option value="shoes">Shoes</option>
+                        <option value="watch-accessories">Watch &amp; accessories</option>
+                        <option value="cap">Cap</option>
+                        <option value="cosmetics">Cosmetics</option>
+                        <option value="undies">Undies</option>
+                    </select></label>
+                    <label for="product-description">Description<textarea id="product-description" required placeholder="Short product description"></textarea></label>
+                    <label>Sizes available
+                        <span class="admin-checks">
+                            <label><input type="checkbox" name="size" value="XS"> XS</label>
+                            <label><input type="checkbox" name="size" value="S"> S</label>
+                            <label><input type="checkbox" name="size" value="M"> M</label>
+                            <label><input type="checkbox" name="size" value="L"> L</label>
+                            <label><input type="checkbox" name="size" value="XL"> XL</label>
+                        </span>
+                    </label>
+                    <label for="product-colors">Color available<input id="product-colors" required type="text" placeholder="e.g. Black, sand"></label>
+                    <label for="product-price">Price in dollars<input id="product-price" required min="0" step="0.01" type="number" placeholder="96"></label>
+                    <input id="product-image" type="hidden">
+                    <label for="product-image-file">Item image from your computer<input id="product-image-file" accept="image/*" required type="file"></label>
+                    <label class="availability-toggle"><input id="product-available" checked type="checkbox"> Available for purchase</label>
+                    <div class="admin-actions">
+                        <button class="admin-primary" id="save-product" type="submit">Add item</button>
+                        <button class="admin-secondary" id="cancel-edit" type="button" hidden>Cancel edit</button>
+                    </div>
+                    <p class="admin-status" id="form-status" role="status"></p>
+                </form>
+            </section>
+
+            <section class="admin-panel" aria-labelledby="inventory-title">
+                <h2 id="inventory-title">Your inventory</h2>
+                <div class="admin-list" id="inventory-list"></div>
+            </section>
+        </div>
+    </main>
+    <script src="admin.js"></script>
+</body>
+</html>

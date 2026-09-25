@@ -8,6 +8,25 @@ try {
 }
 const formatNaira = (amount) => `₦${amount.toLocaleString('en-NG')}`;
 const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
+const inventoryStorageKey = 'bastoInventory';
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
+let adminInventory = [];
+try {
+    const savedInventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
+    adminInventory = Array.isArray(savedInventory) ? savedInventory : [];
+} catch (error) {
+    localStorage.removeItem(inventoryStorageKey);
+}
+
+const categoryId = window.location.pathname.split('/').pop().replace('.html', '');
+const categorySection = document.querySelector('.category-page');
+const categoryGrid = categorySection?.querySelector('.clothing-grid');
+const categoryItems = adminInventory.filter((item) => item.category === categoryId);
+if (categoryGrid && categoryItems.length) {
+    categoryGrid.insertAdjacentHTML('beforeend', categoryItems.map((item) => `<article class="clothing-card" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml((item.sizes || []).join('|'))}" data-color="${escapeHtml(item.colors || 'Color not specified')}" data-available="${item.available !== false}"><div class="clothing-image"${item.image ? ` style="background-image: url('${safeImageUrl(item.image)}')"` : ''}>${item.available === false ? '<span class="clothing-label sold-out-label">Sold out</span>' : ''}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)} · ${escapeHtml(item.colors || 'Color not specified')}</p></div><strong>$${Number(item.price)}</strong></div><button class="add-to-cart${item.available === false ? ' sold-out-button' : ''}" type="button"${item.available === false ? ' disabled' : ''}>${item.available === false ? 'Sold out' : 'Add to cart <span aria-hidden="true">+</span>'}</button></article>`).join(''));
+    categorySection.querySelector('.catalog-count').textContent = `${categoryGrid.querySelectorAll('.clothing-card').length} pieces`;
+}
 
 const headerActions = document.querySelector('.header-actions');
 headerActions.insertAdjacentHTML('afterbegin', '<button class="icon-button cart-button" type="button" aria-label="Shopping cart, 0 items"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h2l1.7 10.2h10.9L20.5 8H6.2"></path><circle cx="9" cy="19" r="1"></circle><circle cx="17" cy="19" r="1"></circle></svg><span class="cart-count">0</span></button>');
@@ -83,7 +102,16 @@ const openProductDetails = (card) => {
     document.querySelector('#product-modal-title').textContent = product.name;
     document.querySelector('#product-modal-color').textContent = product.color;
     document.querySelector('#product-modal-price').textContent = formatNaira(product.price);
-    document.querySelector('#product-size').value = '';
+    document.querySelector('.modal-description').textContent = card.dataset.description || 'A considered Basto Luxury & Wears essential, designed for comfortable everyday wear and easy layering.';
+    const sizeSelect = document.querySelector('#product-size');
+    const sizes = (card.dataset.sizes || 'XS|S|M|L|XL').split('|').filter(Boolean);
+    sizeSelect.innerHTML = '<option value="">Choose a size</option>';
+    sizes.forEach((size) => sizeSelect.insertAdjacentHTML('beforeend', `<option>${escapeHtml(size)}</option>`));
+    const available = card.dataset.available !== 'false';
+    const modalAddButton = document.querySelector('#modal-add-to-cart');
+    modalAddButton.disabled = !available;
+    modalAddButton.textContent = available ? 'Add to cart +' : 'Sold out';
+    sizeSelect.value = '';
     productModal.hidden = false;
     document.body.classList.add('modal-open');
 };
@@ -128,6 +156,7 @@ cartItemsElement.addEventListener('click', (event) => {
 });
 
 document.querySelector('#modal-add-to-cart').addEventListener('click', () => {
+    if (selectedCard?.dataset.available === 'false') return;
     const size = document.querySelector('#product-size').value;
     if (!size || !selectedCard) {
         document.querySelector('#product-size').focus();

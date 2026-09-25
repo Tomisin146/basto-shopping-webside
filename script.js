@@ -6,6 +6,8 @@ const productModal = document.querySelector('#product-modal');
 const modalTitle = document.querySelector('#product-modal-title');
 const modalColor = document.querySelector('#product-modal-color');
 const modalPrice = document.querySelector('#product-modal-price');
+const modalDescription = document.querySelector('.modal-description');
+const productSize = document.querySelector('#product-size');
 const modalAddButton = document.querySelector('#modal-add-to-cart');
 const cartDrawer = document.querySelector('#cart-drawer');
 const cartItemsElement = document.querySelector('#cart-items');
@@ -20,9 +22,22 @@ try {
 	localStorage.removeItem(cartStorageKey);
 }
 const whatsappNumber = '2347072305794';
+const inventoryStorageKey = 'bastoInventory';
 let selectedProduct = null;
 const formatNaira = (amount) => `₦${amount.toLocaleString('en-NG')}`;
 const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
+const getInventory = () => {
+	try {
+		const inventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
+		return Array.isArray(inventory) ? inventory : [];
+	} catch (error) {
+		localStorage.removeItem(inventoryStorageKey);
+		return [];
+	}
+};
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
+const adminInventory = getInventory();
 
 const categoryCatalog = [
 	{
@@ -81,14 +96,47 @@ const categoryCatalog = [
 	}
 ];
 
+const renderProductCard = (product) => `<article class="clothing-card" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${product.available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${product.available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p></div><strong>$${product.price}</strong></div><button class="add-to-cart${product.available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${product.available ? '' : ' disabled'}>${product.available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
 const catalogSections = document.querySelector('#catalog-sections');
 categoryCatalog.forEach((category) => {
+	const adminProducts = adminInventory
+		.filter((item) => item.category === category.id)
+		.map((item) => ({
+			name: item.name,
+			details: `${item.description} · ${item.colors || 'Color not specified'}`,
+			price: Number(item.price),
+			image: safeImageUrl(item.image),
+			available: item.available !== false,
+			description: item.description,
+			sizes: item.sizes || [],
+			colors: item.colors || 'Color not specified'
+		}));
+	const products = [
+		...category.products.map(([name, details, price, image]) => ({ name, details, price, image, available: true, description: 'A considered Basto essential, designed for comfortable everyday wear and easy layering.', sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: details.split('·').pop().trim() })),
+		...adminProducts
+	];
 	const section = document.createElement('section');
 	section.className = 'clothing-section catalog-section';
 	section.id = category.id;
-	section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">5 pieces</span></div><div class="clothing-grid">${category.products.map(([name, details, price, image]) => `<article class="clothing-card"><div class="clothing-image" style="background-image: url('${image}')"></div><div class="clothing-details"><div><h3>${name}</h3><p>${details}</p></div><strong>$${price}</strong></div><button class="add-to-cart" type="button" data-product="${name}">Add to cart <span aria-hidden="true">+</span></button></article>`).join('')}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
+	section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${products.length} pieces</span></div><div class="clothing-grid">${products.map(renderProductCard).join('')}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
 	catalogSections.appendChild(section);
 });
+
+const adminTops = adminInventory.filter((item) => item.category === 'tops').map((item) => ({
+	name: item.name,
+	details: `${item.description} · ${item.colors || 'Color not specified'}`,
+	price: Number(item.price),
+	image: safeImageUrl(item.image),
+	available: item.available !== false,
+	description: item.description,
+	sizes: item.sizes || [],
+	colors: item.colors || 'Color not specified'
+}));
+if (adminTops.length) {
+	const topsSection = document.querySelector('#tops');
+	topsSection.querySelector('.clothing-grid').insertAdjacentHTML('beforeend', adminTops.map(renderProductCard).join(''));
+	topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
+}
 
 document.querySelectorAll('.clothing-details strong, .product-card small').forEach((priceElement) => {
 	const originalPrice = Number(priceElement.textContent.replace(/[^0-9.]/g, ''));
@@ -98,8 +146,10 @@ const getCardData = (card) => ({
 	name: card.querySelector('h3').textContent,
 	color: card.querySelector('.clothing-details p').textContent.split('·').pop().trim(),
 	price: Number(card.querySelector('.clothing-details strong').textContent.replace(/[^0-9.]/g, '')),
-	image: card.querySelector('.clothing-image').style.backgroundImage || getComputedStyle(card.querySelector('.clothing-image')).backgroundImage
+	image: normalizeImageValue(card.querySelector('.clothing-image').style.backgroundImage || getComputedStyle(card.querySelector('.clothing-image')).backgroundImage)
 });
+
+const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)["']?\)$/, '$1');
 
 const renderCart = () => {
 	localStorage.setItem(cartStorageKey, JSON.stringify(cartItems));
@@ -110,7 +160,9 @@ const renderCart = () => {
 		cartItems.forEach((item, index) => {
 			const itemElement = document.createElement('div');
 			itemElement.className = 'cart-item';
-			itemElement.innerHTML = `<div class="cart-item-image" style="background-image: ${item.image}"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p></div><strong>${formatNaira(item.price)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
+			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p></div><strong>${formatNaira(item.price)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
+			const imageUrl = normalizeImageValue(item.image);
+			if (imageUrl) itemElement.querySelector('.cart-item-image').style.backgroundImage = `url("${imageUrl}")`;
 			cartItemsElement.appendChild(itemElement);
 		});
 	}
@@ -120,6 +172,13 @@ const renderCart = () => {
 };
 
 renderCart();
+
+const clearCart = () => {
+	cartItems = [];
+	localStorage.removeItem(cartStorageKey);
+	renderCart();
+	setCartOpen(false);
+};
 
 const addProductToCart = (card, size = 'M') => {
 	cartItems.push({ ...getCardData(card), size });
@@ -161,9 +220,20 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 	const openProductDetails = () => {
 		selectedProduct = card;
 		modalTitle.textContent = card.querySelector('h3').textContent;
-		modalColor.textContent = getCardData(card).color;
+		modalColor.textContent = card.dataset.color || getCardData(card).color;
 		modalPrice.textContent = card.querySelector('.clothing-details strong').textContent;
-		modalAddButton.textContent = 'Add to cart +';
+		modalDescription.textContent = card.dataset.description || 'A considered Basto essential, designed for comfortable everyday wear and easy layering.';
+		const sizes = (card.dataset.sizes || 'XS|S|M|L|XL').split('|').filter(Boolean);
+		productSize.innerHTML = '<option value="">Choose a size</option>';
+		sizes.forEach((size) => {
+			const option = document.createElement('option');
+			option.value = size;
+			option.textContent = size;
+			productSize.appendChild(option);
+		});
+		const available = card.dataset.available !== 'false';
+		modalAddButton.disabled = !available;
+		modalAddButton.textContent = available ? 'Add to cart +' : 'Sold out';
 		productModal.hidden = false;
 		document.body.classList.add('modal-open');
 	};
@@ -188,7 +258,8 @@ document.querySelectorAll('[data-close-product]').forEach((control) => {
 
 modalAddButton.addEventListener('click', () => {
 	if (!selectedProduct) return;
-	const selectedSize = document.querySelector('#product-size').value;
+	if (selectedProduct.dataset.available === 'false') return;
+	const selectedSize = productSize.value;
 	if (!selectedSize) {
 		document.querySelector('#product-size').focus();
 		return;
@@ -218,14 +289,15 @@ checkoutButton.addEventListener('click', () => {
 	const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | ${formatNaira(item.price)}`);
 	const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + item.price, 0))}\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
 	sessionStorage.setItem('bastoCheckoutPending', 'true');
+	clearCart();
 	window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 });
 
-	window.addEventListener('pageshow', () => {
-		if (sessionStorage.getItem('bastoCheckoutPending') !== 'true') return;
-		sessionStorage.removeItem('bastoCheckoutPending');
-		window.location.reload();
-	});
+window.addEventListener('pageshow', () => {
+	if (sessionStorage.getItem('bastoCheckoutPending') !== 'true') return;
+	sessionStorage.removeItem('bastoCheckoutPending');
+	clearCart();
+});
 
 const searchInput = document.querySelector('#site-search');
 const searchableSections = document.querySelectorAll('.clothing-section');
