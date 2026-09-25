@@ -2,6 +2,11 @@ const adminSessionKey = 'bastoAdminAuthenticated';
 if (sessionStorage.getItem(adminSessionKey) !== 'true') window.location.replace('admin-login.html');
 
 const inventoryStorageKey = 'bastoInventory';
+const inventoryResetKey = 'bastoInventoryReset2026';
+if (!localStorage.getItem(inventoryResetKey)) {
+    localStorage.removeItem(inventoryStorageKey);
+    localStorage.setItem(inventoryResetKey, 'true');
+}
 const categories = {
     tops: 'Tops',
     pants: 'Pants',
@@ -19,6 +24,8 @@ const productCategory = document.querySelector('#product-category');
 const productDescription = document.querySelector('#product-description');
 const productColors = document.querySelector('#product-colors');
 const productPrice = document.querySelector('#product-price');
+const productStock = document.querySelector('#product-stock');
+const productSold = document.querySelector('#product-sold');
 const productImage = document.querySelector('#product-image');
 const productImageFile = document.querySelector('#product-image-file');
 const productAvailable = document.querySelector('#product-available');
@@ -80,6 +87,8 @@ const resetForm = () => {
     productId.value = '';
     productImageFile.required = true;
     productAvailable.checked = true;
+    productStock.value = 1;
+    productSold.value = 0;
     saveButton.textContent = 'Add item';
     cancelEditButton.hidden = true;
     formTitle.textContent = 'Add an item';
@@ -91,18 +100,25 @@ const renderInventory = () => {
         return;
     }
 
-    inventoryList.innerHTML = inventory.map((item) => `<article class="admin-item">
+    inventoryList.innerHTML = Object.entries(categories).map(([categoryId, categoryName]) => {
+        const categoryItems = inventory.filter((item) => item.category === categoryId);
+        if (!categoryItems.length) return '';
+        return `<section class="admin-category-group"><h3 class="admin-category-title">${categoryName}</h3>${categoryItems.map((item) => {
+            const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
+            return `<article class="admin-item">
         <div>
             <h3>${escapeHtml(item.name)}</h3>
-            <p>${escapeHtml(categories[item.category] || item.category)} · ${escapeHtml(item.colors)} · ${item.sizes.length ? escapeHtml(item.sizes.join(', ')) : 'One size'}</p>
+            <p>${escapeHtml(categories[item.category] || item.category)} · ${escapeHtml(item.colors)} · ${item.sizes.length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
         </div>
-        <div class="admin-item-meta"><strong>${formatPrice(item.price)}</strong><span class="${item.available ? '' : 'sold-out-label'}">${item.available ? 'Available' : 'Sold out'}</span></div>
+        <div class="admin-item-meta"><strong>${formatPrice(item.price)}</strong><span class="${item.available && remaining ? '' : 'sold-out-label'}">${item.available && remaining ? `${remaining} pcs left` : 'Sold out'}</span></div>
         <div class="admin-actions">
             <button class="admin-secondary" type="button" data-action="toggle" data-id="${item.id}">${item.available ? 'Mark sold out' : 'Make available'}</button>
             <button class="admin-secondary" type="button" data-action="edit" data-id="${item.id}">Edit</button>
             <button class="admin-danger" type="button" data-action="delete" data-id="${item.id}">Delete</button>
         </div>
-    </article>`).join('');
+    </article>`;
+        }).join('')}</section>`;
+    }).join('');
 };
 
 const startEdit = (item) => {
@@ -112,6 +128,8 @@ const startEdit = (item) => {
     productDescription.value = item.description;
     productColors.value = item.colors;
     productPrice.value = item.price;
+    productStock.value = item.stock ?? 1;
+    productSold.value = item.sold ?? 0;
     productImage.value = item.image || '';
     productImageFile.required = false;
     productAvailable.checked = item.available;
@@ -137,6 +155,8 @@ form.addEventListener('submit', async (event) => {
             sizes: selectedSizes(),
             colors: productColors.value.trim(),
             price: Number(productPrice.value),
+            stock: Number(productStock.value),
+            sold: Number(productSold.value),
             image: uploadedImage || productImage.value.trim(),
             available: productAvailable.checked
         };

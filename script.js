@@ -8,23 +8,34 @@ const modalColor = document.querySelector('#product-modal-color');
 const modalPrice = document.querySelector('#product-modal-price');
 const modalDescription = document.querySelector('.modal-description');
 const productSize = document.querySelector('#product-size');
+const productQuantity = document.querySelector('#product-quantity');
 const modalAddButton = document.querySelector('#modal-add-to-cart');
 const cartDrawer = document.querySelector('#cart-drawer');
 const cartItemsElement = document.querySelector('#cart-items');
 const cartSubtotal = document.querySelector('#cart-subtotal');
 const cartBackdrop = document.querySelector('.cart-backdrop');
 const checkoutButton = document.querySelector('#checkout-button');
+const searchInput = document.querySelector('#site-search');
+const searchBar = document.querySelector('.search-bar');
 const cartStorageKey = 'bastoCart';
 let cartItems = [];
+
 try {
 	cartItems = JSON.parse(localStorage.getItem(cartStorageKey) || '[]');
 } catch (error) {
 	localStorage.removeItem(cartStorageKey);
 }
+
 const whatsappNumber = '2347072305794';
 const inventoryStorageKey = 'bastoInventory';
+const inventoryResetKey = 'bastoInventoryReset2026';
+if (!localStorage.getItem(inventoryResetKey)) {
+	localStorage.removeItem(inventoryStorageKey);
+	localStorage.setItem(inventoryResetKey, 'true');
+}
+
 let selectedProduct = null;
-const formatNaira = (amount) => `₦${amount.toLocaleString('en-NG')}`;
+const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
 const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
 const getInventory = () => {
 	try {
@@ -38,6 +49,8 @@ const getInventory = () => {
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
 const adminInventory = getInventory();
+const maxHomeProducts = 10;
+document.querySelector('.new-arrivals .product-grid')?.replaceChildren();
 
 const categoryCatalog = [
 	{
@@ -96,31 +109,36 @@ const categoryCatalog = [
 	}
 ];
 
-const renderProductCard = (product) => `<article class="clothing-card" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${product.available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${product.available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p></div><strong>$${product.price}</strong></div><button class="add-to-cart${product.available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${product.available ? '' : ' disabled'}>${product.available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+const renderProductCard = (product) => {
+	const remaining = Math.max(0, product.stock - product.sold);
+	const available = product.available && remaining > 0;
+	return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>$${product.price}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+};
+
 const catalogSections = document.querySelector('#catalog-sections');
-categoryCatalog.forEach((category) => {
-	const adminProducts = adminInventory
-		.filter((item) => item.category === category.id)
-		.map((item) => ({
-			name: item.name,
-			details: `${item.description} · ${item.colors || 'Color not specified'}`,
-			price: Number(item.price),
-			image: safeImageUrl(item.image),
-			available: item.available !== false,
-			description: item.description,
-			sizes: item.sizes || [],
-			colors: item.colors || 'Color not specified'
-		}));
-	const products = [
-		...category.products.map(([name, details, price, image]) => ({ name, details, price, image, available: true, description: 'A considered Basto essential, designed for comfortable everyday wear and easy layering.', sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: details.split('·').pop().trim() })),
-		...adminProducts
-	];
-	const section = document.createElement('section');
-	section.className = 'clothing-section catalog-section';
-	section.id = category.id;
-	section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${products.length} pieces</span></div><div class="clothing-grid">${products.map(renderProductCard).join('')}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
-	catalogSections.appendChild(section);
-});
+if (catalogSections) {
+	categoryCatalog.forEach((category) => {
+		const adminProducts = adminInventory
+			.filter((item) => item.category === category.id)
+			.map((item) => ({
+				name: item.name,
+				details: `${item.description} · ${item.colors || 'Color not specified'}`,
+				price: Number(item.price),
+				image: safeImageUrl(item.image),
+				available: item.available !== false,
+				stock: Number(item.stock ?? 1),
+				sold: Number(item.sold ?? 0),
+				description: item.description,
+				sizes: item.sizes || [],
+				colors: item.colors || 'Color not specified'
+			}));
+		const section = document.createElement('section');
+		section.className = 'clothing-section catalog-section';
+		section.id = category.id;
+		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${adminProducts.length} pieces</span></div><div class="clothing-grid">${adminProducts.length ? adminProducts.slice(0, maxHomeProducts).map(renderProductCard).join('') : '<p class="catalog-empty">No items available in this category yet.</p>'}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
+		catalogSections.appendChild(section);
+	});
+}
 
 const adminTops = adminInventory.filter((item) => item.category === 'tops').map((item) => ({
 	name: item.name,
@@ -128,47 +146,63 @@ const adminTops = adminInventory.filter((item) => item.category === 'tops').map(
 	price: Number(item.price),
 	image: safeImageUrl(item.image),
 	available: item.available !== false,
+	stock: Number(item.stock ?? 1),
+	sold: Number(item.sold ?? 0),
 	description: item.description,
 	sizes: item.sizes || [],
 	colors: item.colors || 'Color not specified'
 }));
-if (adminTops.length) {
-	const topsSection = document.querySelector('#tops');
-	topsSection.querySelector('.clothing-grid').insertAdjacentHTML('beforeend', adminTops.map(renderProductCard).join(''));
-	topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
+
+const topsSection = document.querySelector('#tops');
+if (topsSection) {
+	if (adminTops.length) {
+		topsSection.querySelector('.clothing-grid')?.insertAdjacentHTML('beforeend', adminTops.map(renderProductCard).join(''));
+		topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
+	} else {
+		topsSection.querySelector('.clothing-grid').innerHTML = '<p class="catalog-empty">No items available in this category yet.</p>';
+	}
 }
+
+const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)['"]?\)$/, '$1');
 
 document.querySelectorAll('.clothing-details strong, .product-card small').forEach((priceElement) => {
 	const originalPrice = Number(priceElement.textContent.replace(/[^0-9.]/g, ''));
 	if (originalPrice) priceElement.textContent = formatNaira(convertToNaira(originalPrice));
 });
+
 const getCardData = (card) => ({
 	name: card.querySelector('h3').textContent,
 	color: card.querySelector('.clothing-details p').textContent.split('·').pop().trim(),
 	price: Number(card.querySelector('.clothing-details strong').textContent.replace(/[^0-9.]/g, '')),
-	image: normalizeImageValue(card.querySelector('.clothing-image').style.backgroundImage || getComputedStyle(card.querySelector('.clothing-image')).backgroundImage)
+	image: normalizeImageValue(card.querySelector('.clothing-image').style.backgroundImage || getComputedStyle(card.querySelector('.clothing-image')).backgroundImage),
+	stock: Number(card.dataset.stock || 1)
 });
 
-const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)["']?\)$/, '$1');
-
 const renderCart = () => {
+	if (!cartItemsElement || !cartCount || !cartSubtotal || !cartButton) return;
 	localStorage.setItem(cartStorageKey, JSON.stringify(cartItems));
 	cartItemsElement.innerHTML = '';
 	if (!cartItems.length) {
 		cartItemsElement.innerHTML = '<p class="cart-empty">Your cart is empty.</p>';
 	} else {
 		cartItems.forEach((item, index) => {
+			const quantity = Number(item.quantity || 1);
+			const productQuantity = cartItems
+				.filter((cartItem) => cartItem.name === item.name)
+				.reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0);
+			const availableForItem = Number(item.stock || 1) - (productQuantity - quantity);
 			const itemElement = document.createElement('div');
 			itemElement.className = 'cart-item';
-			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p></div><strong>${formatNaira(item.price)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
+			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p><div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
 			const imageUrl = normalizeImageValue(item.image);
 			if (imageUrl) itemElement.querySelector('.cart-item-image').style.backgroundImage = `url("${imageUrl}")`;
 			cartItemsElement.appendChild(itemElement);
 		});
 	}
-	cartCount.textContent = cartItems.length;
-	cartSubtotal.textContent = formatNaira(cartItems.reduce((total, item) => total + item.price, 0));
-	cartButton.setAttribute('aria-label', `Shopping cart, ${cartItems.length} items`);
+	const totalQuantity = cartItems.reduce((total, item) => total + Number(item.quantity || 1), 0);
+	cartCount.textContent = String(totalQuantity);
+	cartSubtotal.textContent = formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0));
+	cartButton.setAttribute('aria-label', `Shopping cart, ${totalQuantity} items`);
 };
 
 renderCart();
@@ -177,37 +211,62 @@ const clearCart = () => {
 	cartItems = [];
 	localStorage.removeItem(cartStorageKey);
 	renderCart();
-	setCartOpen(false);
+	if (cartDrawer && cartBackdrop) setCartOpen(false);
 };
 
-const addProductToCart = (card, size = 'M') => {
-	cartItems.push({ ...getCardData(card), size });
+const addProductToCart = (card, size = 'M', quantity = 1) => {
+	if (!card) return;
+	const product = { ...getCardData(card), size, quantity };
+	const productQuantityInCart = cartItems
+		.filter((item) => item.name === product.name)
+		.reduce((total, item) => total + Number(item.quantity || 1), 0);
+	const remainingStock = Math.max(0, Number(product.stock || 1) - productQuantityInCart);
+	if (!remainingStock) {
+		window.alert(`All available ${product.name} items are already in your cart.`);
+		return;
+	}
+	const existingItem = cartItems.find((item) => item.name === product.name && item.size === product.size);
+	if (existingItem) {
+		const nextQuantity = Number(existingItem.quantity || 1) + Number(quantity || 1);
+		existingItem.quantity = Math.min(Number(product.stock || 1), nextQuantity);
+	} else {
+		cartItems.push({ ...product, quantity: Math.min(remainingStock, Number(quantity || 1)) });
+	}
 	renderCart();
 };
 
 const setCartOpen = (isOpen) => {
+	if (!cartDrawer || !cartBackdrop) return;
 	cartDrawer.classList.toggle('open', isOpen);
 	cartDrawer.setAttribute('aria-hidden', String(!isOpen));
 	cartBackdrop.classList.toggle('open', isOpen);
 	if (isOpen) document.body.classList.add('modal-open');
-	else if (productModal.hidden) document.body.classList.remove('modal-open');
+	else if (!productModal || productModal.hidden) document.body.classList.remove('modal-open');
 };
 
-menuToggle.addEventListener('click', () => {
-	const isOpen = navigation.classList.toggle('open');
-	menuToggle.setAttribute('aria-expanded', String(isOpen));
-});
-
-navigation.querySelectorAll('a').forEach((link) => {
-	link.addEventListener('click', () => {
-		navigation.classList.remove('open');
-		menuToggle.setAttribute('aria-expanded', 'false');
+if (menuToggle && navigation) {
+	menuToggle.addEventListener('click', () => {
+		const isOpen = navigation.classList.toggle('open');
+		menuToggle.setAttribute('aria-expanded', String(isOpen));
 	});
-});
+
+	navigation.querySelectorAll('a').forEach((link) => {
+		link.addEventListener('click', () => {
+			navigation.classList.remove('open');
+			menuToggle.setAttribute('aria-expanded', 'false');
+		});
+	});
+}
 
 document.querySelectorAll('.add-to-cart').forEach((button) => {
 	button.addEventListener('click', () => {
-		addProductToCart(button.closest('.clothing-card'));
+		const card = button.closest('.clothing-card');
+		if (!card) return;
+		if (Number(card.dataset.stock || 1) > 1) {
+			card.click();
+			return;
+		}
+		addProductToCart(card);
 		button.classList.add('added');
 		button.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
 	});
@@ -218,13 +277,15 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 	card.setAttribute('aria-label', `View details for ${card.querySelector('h3').textContent}`);
 
 	const openProductDetails = () => {
+		if (!modalTitle || !modalColor || !modalPrice || !modalDescription || !productSize || !productQuantity || !modalAddButton || !productModal) return;
 		selectedProduct = card;
 		modalTitle.textContent = card.querySelector('h3').textContent;
 		modalColor.textContent = card.dataset.color || getCardData(card).color;
 		modalPrice.textContent = card.querySelector('.clothing-details strong').textContent;
 		modalDescription.textContent = card.dataset.description || 'A considered Basto essential, designed for comfortable everyday wear and easy layering.';
 		const sizes = (card.dataset.sizes || 'XS|S|M|L|XL').split('|').filter(Boolean);
-		productSize.innerHTML = '<option value="">Choose a size</option>';
+		productSize.disabled = sizes.length === 1;
+		productSize.innerHTML = sizes.length === 1 ? `<option value="${sizes[0]}">${sizes[0]} available</option>` : '<option value="">Choose a size</option>';
 		sizes.forEach((size) => {
 			const option = document.createElement('option');
 			option.value = size;
@@ -232,8 +293,15 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 			productSize.appendChild(option);
 		});
 		const available = card.dataset.available !== 'false';
-		modalAddButton.disabled = !available;
-		modalAddButton.textContent = available ? 'Add to cart +' : 'Sold out';
+		productQuantity.max = String(card.dataset.stock || 1);
+		const quantityInCart = cartItems
+			.filter((item) => item.name === card.querySelector('h3').textContent)
+			.reduce((total, item) => total + Number(item.quantity || 1), 0);
+		productQuantity.max = String(Math.max(0, Number(card.dataset.stock || 1) - quantityInCart));
+		productQuantity.value = '1';
+		productQuantity.disabled = !available || Number(productQuantity.max) < 1;
+		modalAddButton.disabled = !available || Number(productQuantity.max) < 1;
+		modalAddButton.textContent = available && Number(productQuantity.max) > 0 ? 'Add to cart +' : 'Sold out';
 		productModal.hidden = false;
 		document.body.classList.add('modal-open');
 	};
@@ -251,47 +319,76 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 
 document.querySelectorAll('[data-close-product]').forEach((control) => {
 	control.addEventListener('click', () => {
-		productModal.hidden = true;
+		if (productModal) productModal.hidden = true;
 		document.body.classList.remove('modal-open');
 	});
 });
 
-modalAddButton.addEventListener('click', () => {
-	if (!selectedProduct) return;
-	if (selectedProduct.dataset.available === 'false') return;
-	const selectedSize = productSize.value;
-	if (!selectedSize) {
-		document.querySelector('#product-size').focus();
-		return;
-	}
-	const addButton = selectedProduct.querySelector('.add-to-cart');
-	addProductToCart(selectedProduct, selectedSize);
-	addButton.classList.add('added');
-	addButton.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
-	modalAddButton.textContent = 'Added to cart ✓';
-});
+if (modalAddButton) {
+	modalAddButton.addEventListener('click', () => {
+		if (!selectedProduct) return;
+		if (selectedProduct.dataset.available === 'false') return;
+		const selectedSize = productSize ? productSize.value : '';
+		const requestedQuantity = Number(productQuantity.value) || 1;
+		const maximumQuantity = Number(productQuantity.max) || 1;
+		if (requestedQuantity > maximumQuantity) {
+			productQuantity.value = String(maximumQuantity);
+			window.alert(`Only ${maximumQuantity} pcs left.`);
+			return;
+		}
+		const quantity = Math.max(1, requestedQuantity);
+		if (!selectedSize) {
+			productSize?.focus();
+			return;
+		}
+		const addButton = selectedProduct.querySelector('.add-to-cart');
+		addProductToCart(selectedProduct, selectedSize, quantity);
+		if (addButton) {
+			addButton.classList.add('added');
+			addButton.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
+		}
+		modalAddButton.textContent = 'Added to cart ✓';
+	});
+}
 
-cartButton.addEventListener('click', () => setCartOpen(true));
+if (cartButton) cartButton.addEventListener('click', () => setCartOpen(true));
 document.querySelectorAll('[data-close-cart]').forEach((control) => control.addEventListener('click', () => setCartOpen(false)));
-cartItemsElement.addEventListener('click', (event) => {
-	const removeButton = event.target.closest('[data-remove-item]');
-	if (!removeButton) return;
-	cartItems.splice(Number(removeButton.dataset.removeItem), 1);
-	renderCart();
-});
 
-checkoutButton.addEventListener('click', () => {
-	if (!cartItems.length) {
-		window.alert('Your cart is empty. Add an item before checking out.');
-		return;
-	}
+if (cartItemsElement) {
+	cartItemsElement.addEventListener('click', (event) => {
+		const quantityButton = event.target.closest('[data-change-quantity]');
+		if (quantityButton) {
+			const item = cartItems[Number(quantityButton.dataset.itemIndex)];
+			if (!item) return;
+			const nextQuantity = Number(item.quantity || 1) + Number(quantityButton.dataset.changeQuantity);
+			const otherSizeQuantity = cartItems
+				.filter((cartItem) => cartItem !== item && cartItem.name === item.name)
+				.reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0);
+			item.quantity = Math.max(1, Math.min(Number(item.stock || 1) - otherSizeQuantity, nextQuantity));
+			renderCart();
+			return;
+		}
+		const removeButton = event.target.closest('[data-remove-item]');
+		if (!removeButton) return;
+		cartItems.splice(Number(removeButton.dataset.removeItem), 1);
+		renderCart();
+	});
+}
 
-	const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | ${formatNaira(item.price)}`);
-	const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + item.price, 0))}\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
-	sessionStorage.setItem('bastoCheckoutPending', 'true');
-	clearCart();
-	window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-});
+if (checkoutButton) {
+	checkoutButton.addEventListener('click', () => {
+		if (!cartItems.length) {
+			window.alert('Your cart is empty. Add an item before checking out.');
+			return;
+		}
+
+		const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | Qty: ${item.quantity || 1} | ${formatNaira(item.price * Number(item.quantity || 1))}`);
+		const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0))}\n\nPayment options:\n1. Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears\n\n2. OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin\n\nPlease send your payment receipt to WhatsApp: +234 707 230 5794\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
+		sessionStorage.setItem('bastoCheckoutPending', 'true');
+		clearCart();
+		window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+	});
+}
 
 window.addEventListener('pageshow', () => {
 	if (sessionStorage.getItem('bastoCheckoutPending') !== 'true') return;
@@ -299,20 +396,24 @@ window.addEventListener('pageshow', () => {
 	clearCart();
 });
 
-const searchInput = document.querySelector('#site-search');
-const searchableSections = document.querySelectorAll('.clothing-section');
-searchInput.addEventListener('input', () => {
-	const query = searchInput.value.trim().toLowerCase();
-	searchableSections.forEach((section) => {
-		const cards = section.querySelectorAll('.clothing-card');
-		let visibleCards = 0;
-		cards.forEach((card) => {
-			const matches = !query || card.textContent.toLowerCase().includes(query) || section.querySelector('h2').textContent.toLowerCase().includes(query);
-			card.hidden = !matches;
-			if (matches) visibleCards += 1;
+if (searchInput) {
+	const searchableSections = document.querySelectorAll('.clothing-section');
+	searchInput.addEventListener('input', () => {
+		const query = searchInput.value.trim().toLowerCase();
+		searchableSections.forEach((section) => {
+			const cards = section.querySelectorAll('.clothing-card');
+			let visibleCards = 0;
+			cards.forEach((card) => {
+				const heading = section.querySelector('h2, h1')?.textContent?.toLowerCase() || '';
+				const matches = !query || card.textContent.toLowerCase().includes(query) || heading.includes(query);
+				card.hidden = !matches;
+				if (matches) visibleCards += 1;
+			});
+			section.hidden = visibleCards === 0;
 		});
-		section.hidden = visibleCards === 0;
 	});
-});
+}
 
-document.querySelector('.search-bar').addEventListener('submit', (event) => event.preventDefault());
+if (searchBar) {
+	searchBar.addEventListener('submit', (event) => event.preventDefault());
+}
