@@ -17,6 +17,14 @@ const cartItemsElement = document.querySelector('#cart-items');
 const cartSubtotal = document.querySelector('#cart-subtotal');
 const cartBackdrop = document.querySelector('.cart-backdrop');
 const checkoutButton = document.querySelector('#checkout-button');
+const checkoutModal = document.querySelector('#checkout-modal');
+const checkoutForm = document.querySelector('#checkout-form');
+const checkoutSummary = document.querySelector('#checkout-summary');
+const checkoutStatus = document.querySelector('#checkout-status');
+const placeOrderButton = document.querySelector('#place-order');
+const checkoutPaymentMethod = document.querySelector('#checkout-payment-method');
+const checkoutReceipt = document.querySelector('#checkout-receipt');
+const paymentAccount = document.querySelector('#payment-account');
 const searchInput = document.querySelector('#site-search');
 const searchBar = document.querySelector('.search-bar');
 const cartStorageKey = 'bastoCart';
@@ -386,12 +394,86 @@ if (checkoutButton) {
 			window.alert('Your cart is empty. Add an item before checking out.');
 			return;
 		}
+		const subtotal = cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0);
+		const itemCount = cartItems.reduce((total, item) => total + Number(item.quantity || 1), 0);
+		checkoutSummary.textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'} · ${formatNaira(subtotal)}`;
+		checkoutStatus.textContent = '';
+		setCartOpen(false);
+		checkoutModal.hidden = false;
+		document.body.classList.add('modal-open');
+		document.querySelector('#checkout-name').focus();
+	});
+}
 
-		const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | Qty: ${item.quantity || 1} | ${formatNaira(item.price * Number(item.quantity || 1))}`);
-		const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0))}\n\nPayment options:\n1. Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears\n\n2. OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin\n\nPlease send your payment receipt to WhatsApp: +234 707 230 5794\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
-		sessionStorage.setItem('bastoCheckoutPending', 'true');
-		clearCart();
-		window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+const renderPaymentAccount = () => {
+	paymentAccount.textContent = checkoutPaymentMethod.value === 'OPay'
+		? 'OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin'
+		: 'Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears';
+};
+checkoutPaymentMethod.addEventListener('change', renderPaymentAccount);
+renderPaymentAccount();
+
+document.querySelectorAll('[data-close-checkout]').forEach((control) => control.addEventListener('click', () => {
+	checkoutModal.hidden = true;
+	document.body.classList.remove('modal-open');
+}));
+
+if (checkoutForm) {
+	checkoutForm.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		if (!cartItems.length) return;
+		if (!window.bastoInventoryApi?.configured) {
+			checkoutStatus.textContent = 'Order saving is not connected yet. Please contact us on WhatsApp to order.';
+			return;
+		}
+		const receipt = checkoutReceipt.files[0];
+		if (!receipt) {
+			checkoutStatus.textContent = 'Upload your payment receipt to continue.';
+			return;
+		}
+		if (receipt.size > 5 * 1024 * 1024) {
+			checkoutStatus.textContent = 'Receipt must be 5 MB or smaller.';
+			return;
+		}
+		placeOrderButton.disabled = true;
+		checkoutStatus.textContent = 'Uploading receipt and saving your order...';
+		const orderReference = `BST-${Date.now().toString(36).toUpperCase()}`;
+		const customer = {
+			name: document.querySelector('#checkout-name').value.trim(),
+			phone: document.querySelector('#checkout-phone').value.trim(),
+			address: document.querySelector('#checkout-address').value.trim()
+		};
+		const items = cartItems.map((item) => ({
+			name: item.name,
+			color: item.color,
+			size: item.size,
+			quantity: Number(item.quantity || 1),
+			unit_price: Number(item.price || 0),
+			line_total: Number(item.price || 0) * Number(item.quantity || 1)
+		}));
+		const total = items.reduce((sum, item) => sum + item.line_total, 0);
+		try {
+			const receiptPath = await window.bastoInventoryApi.uploadPaymentReceipt(receipt, orderReference);
+			await window.bastoInventoryApi.createOrder({
+				id: orderReference,
+				customer_name: customer.name,
+				phone: customer.phone,
+				address: customer.address,
+				items,
+				total,
+				payment_method: checkoutPaymentMethod.value,
+				receipt_path: receiptPath,
+				status: 'New'
+			});
+			const orderLines = items.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | Qty: ${item.quantity} | ${formatNaira(item.line_total)}`);
+			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nDelivery address: ${customer.address}\n\nPlease confirm payment and delivery. Thank you.`;
+			sessionStorage.setItem('bastoCheckoutPending', 'true');
+			clearCart();
+			window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+		} catch (error) {
+			checkoutStatus.textContent = error.message || 'Could not save your order. Please try again or contact us on WhatsApp.';
+			placeOrderButton.disabled = false;
+		}
 	});
 }
 

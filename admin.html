@@ -14,12 +14,30 @@
     <main class="admin-shell">
         <header class="admin-header">
             <div>
-                <p class="eyebrow">BASTO / inventory</p>
-                <h1>Manage products.</h1>
-                <p>Add products to a category, describe what is available, and mark individual items sold out whenever stock changes.</p>
+                <p class="eyebrow">BASTO / store desk</p>
+                <h1>Orders and inventory.</h1>
+                <p>Keep customer orders moving, then update products as stock changes.</p>
             </div>
             <div class="admin-header-actions"><a class="admin-link" href="index.html">View storefront <span aria-hidden="true">-></span></a><button class="admin-link admin-logout" id="admin-logout" type="button">Log out</button></div>
         </header>
+
+        <section class="admin-panel orders-panel" aria-labelledby="orders-title">
+            <div class="orders-heading">
+                <div><p class="eyebrow">Customer requests</p><h2 id="orders-title">Orders</h2></div>
+                <button class="admin-secondary" id="refresh-orders" type="button">Refresh</button>
+            </div>
+            <div class="order-tools">
+                <label class="sr-only" for="order-search">Search orders</label>
+                <input id="order-search" type="search" placeholder="Search name, phone, reference or item">
+                <label class="sr-only" for="order-status-filter">Filter by status</label>
+                <select id="order-status-filter">
+                    <option value="all">All statuses</option>
+                    <option>New</option><option>Confirmed</option><option>Paid</option><option>Shipped</option><option>Completed</option><option>Cancelled</option>
+                </select>
+            </div>
+            <p class="admin-status" id="orders-status" role="status"></p>
+            <div class="admin-list orders-list" id="orders-list" aria-live="polite"></div>
+        </section>
 
         <div class="admin-layout">
             <section class="admin-panel" aria-labelledby="product-form-title">

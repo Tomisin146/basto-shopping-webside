@@ -45,6 +45,53 @@
         async deleteProduct(id) {
             const { error } = await requireClient().from('products').delete().eq('id', id);
             if (error) throw error;
+        },
+        async createOrder(order) {
+            const { error } = await requireClient().from('orders').insert(order);
+            if (error) throw error;
+        },
+        async listOrders() {
+            const { data, error } = await requireClient()
+                .from('orders')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
+        async updateOrderStatus(id, status) {
+            const { error } = await requireClient()
+                .from('orders')
+                .update({ status })
+                .eq('id', id);
+            if (error) throw error;
+        },
+        async uploadPaymentReceipt(file, orderId) {
+            const extensions = {
+                'image/jpeg': 'jpg',
+                'image/png': 'png',
+                'image/webp': 'webp',
+                'application/pdf': 'pdf'
+            };
+            const extension = extensions[file.type];
+            if (!extension) throw new Error('Receipt must be a JPG, PNG, WebP image, or PDF.');
+            if (file.size > 5 * 1024 * 1024) throw new Error('Receipt must be 5 MB or smaller.');
+            const safeOrderId = String(orderId).replace(/[^A-Za-z0-9-]/g, '');
+            const fileId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const path = `${safeOrderId}/${fileId}.${extension}`;
+            const { error } = await requireClient()
+                .storage
+                .from('payment-receipts')
+                .upload(path, file, { contentType: file.type, upsert: false });
+            if (error) throw error;
+            return path;
+        },
+        async createPaymentReceiptUrl(path) {
+            const { data, error } = await requireClient()
+                .storage
+                .from('payment-receipts')
+                .createSignedUrl(path, 600);
+            if (error) throw error;
+            return data.signedUrl;
         }
     };
 })();
