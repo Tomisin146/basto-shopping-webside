@@ -1,5 +1,6 @@
 ;(async () => {
 const inventoryStorageKey = 'bastoInventory';
+const categoryPreferenceKey = 'bastoLastProductCategory';
 const categories = {
     tops: 'Tops',
     pants: 'Pants',
@@ -9,11 +10,14 @@ const categories = {
     cosmetics: 'Cosmetics',
     undies: 'Undies'
 };
+const maxVisibleInventoryItems = 10;
+const expandedInventoryCategories = new Set();
 
 const form = document.querySelector('#product-form');
 const productId = document.querySelector('#product-id');
 const productName = document.querySelector('#product-name');
 const productCategory = document.querySelector('#product-category');
+const sizeOptions = document.querySelector('#size-options');
 const productDescription = document.querySelector('#product-description');
 const productColors = document.querySelector('#product-colors');
 const productPrice = document.querySelector('#product-price');
@@ -59,7 +63,18 @@ const readLegacyInventory = () => {
 const makeId = () => window.crypto?.randomUUID?.() || `item-${Date.now()}`;
 const formatPrice = (amount) => `₦${Number(amount).toLocaleString('en-NG')}`;
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+const safeImageSource = (value) => {
+    const image = String(value || '');
+    return /^https?:\/\//i.test(image) || /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(image) ? image : '';
+};
 const selectedSizes = () => [...document.querySelectorAll('input[name="size"]:checked')].map((input) => input.value);
+const renderSizeOptions = (selected = []) => {
+    const sizes = productCategory.value === 'shoes'
+        ? Array.from({ length: 11 }, (_, index) => String(36 + index))
+        : ['XS', 'S', 'M', 'L', 'XL'];
+    const selectedValues = selected.map(String);
+    sizeOptions.innerHTML = sizes.map((size) => `<label><input type="checkbox" name="size" value="${size}"${selectedValues.includes(size) ? ' checked' : ''}> ${size}</label>`).join('');
+};
 const readImageFile = (file) => new Promise((resolve, reject) => {
     if (!file) {
         resolve('');
@@ -85,7 +100,11 @@ const readImageFile = (file) => new Promise((resolve, reject) => {
 });
 
 const resetForm = () => {
+    const selectedCategory = productCategory.value;
     form.reset();
+    productCategory.value = selectedCategory;
+    localStorage.setItem(categoryPreferenceKey, selectedCategory);
+    renderSizeOptions();
     productId.value = '';
     productImageFile.required = true;
     productAvailable.checked = true;
@@ -105,28 +124,43 @@ const renderInventory = () => {
     inventoryList.innerHTML = Object.entries(categories).map(([categoryId, categoryName]) => {
         const categoryItems = inventory.filter((item) => item.category === categoryId);
         if (!categoryItems.length) return '';
-        return `<section class="admin-category-group"><h3 class="admin-category-title">${categoryName}</h3>${categoryItems.map((item) => {
+        const expanded = expandedInventoryCategories.has(categoryId);
+        const visibleItems = expanded ? categoryItems : categoryItems.slice(0, maxVisibleInventoryItems);
+        const itemCards = visibleItems.map((item) => {
             const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
+            const imageSource = safeImageSource(item.image);
             return `<article class="admin-item">
-        <div>
+        <div class="admin-item-image">${imageSource ? `<img src="${escapeHtml(imageSource)}" alt="${escapeHtml(item.name)}" loading="lazy">` : '<span>No image</span>'}</div>
+        <div class="admin-item-details">
             <h3>${escapeHtml(item.name)}</h3>
-            <p>${escapeHtml(categories[item.category] || item.category)} · ${escapeHtml(item.colors)} · ${item.sizes.length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
+            <p>${escapeHtml(categories[item.category] || item.category)} · ${escapeHtml(item.colors)} · ${(item.sizes || []).length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
         </div>
         <div class="admin-item-meta"><strong>${formatPrice(item.price)}</strong><span class="${item.available && remaining ? '' : 'sold-out-label'}">${item.available && remaining ? `${remaining} pcs left` : 'Sold out'}</span></div>
-        <div class="admin-actions">
+        <div class="admin-item-actions">
             <button class="admin-secondary" type="button" data-action="toggle" data-id="${item.id}">${item.available ? 'Mark sold out' : 'Make available'}</button>
             <button class="admin-secondary" type="button" data-action="edit" data-id="${item.id}">Edit</button>
             <button class="admin-danger" type="button" data-action="delete" data-id="${item.id}">Delete</button>
         </div>
     </article>`;
-        }).join('')}</section>`;
+        }).join('');
+        const showMoreButton = categoryItems.length > maxVisibleInventoryItems
+            ? `<button class="admin-secondary admin-show-more" type="button" data-action="show-more" data-category="${categoryId}" aria-expanded="${expanded}">${expanded ? 'Show less' : `Show more (${categoryItems.length - maxVisibleInventoryItems})`}</button>`
+            : '';
+        return `<section class="admin-category-group"><h3 class="admin-category-title">${categoryName} <span>(${categoryItems.length})</span></h3>${itemCards}${showMoreButton}</section>`;
     }).join('');
+    inventoryList.querySelectorAll('.admin-item-image img').forEach((image) => {
+        image.addEventListener('error', () => {
+            image.parentElement.textContent = 'Image unavailable';
+        }, { once: true });
+    });
 };
 
 const startEdit = (item) => {
     productId.value = item.id;
     productName.value = item.name;
     productCategory.value = item.category;
+    localStorage.setItem(categoryPreferenceKey, item.category);
+    renderSizeOptions(item.sizes || []);
     productDescription.value = item.description;
     productColors.value = item.colors;
     productPrice.value = item.price;
@@ -143,6 +177,14 @@ const startEdit = (item) => {
     formTitle.textContent = 'Edit item';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+const preferredCategory = localStorage.getItem(categoryPreferenceKey);
+if (categories[preferredCategory]) productCategory.value = preferredCategory;
+productCategory.addEventListener('change', () => {
+    localStorage.setItem(categoryPreferenceKey, productCategory.value);
+    renderSizeOptions();
+});
+renderSizeOptions();
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -184,6 +226,13 @@ cancelEditButton.addEventListener('click', () => {
 inventoryList.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-action]');
     if (!button) return;
+    if (button.dataset.action === 'show-more') {
+        const categoryId = button.dataset.category;
+        if (expandedInventoryCategories.has(categoryId)) expandedInventoryCategories.delete(categoryId);
+        else expandedInventoryCategories.add(categoryId);
+        renderInventory();
+        return;
+    }
     const itemIndex = inventory.findIndex((item) => item.id === button.dataset.id);
     if (itemIndex < 0) return;
     const item = inventory[itemIndex];

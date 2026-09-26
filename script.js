@@ -141,7 +141,7 @@ if (catalogSections) {
 		const section = document.createElement('section');
 		section.className = 'clothing-section catalog-section';
 		section.id = category.id;
-		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${adminProducts.length} pieces</span></div><div class="clothing-grid">${adminProducts.length ? adminProducts.slice(0, maxHomeProducts).map(renderProductCard).join('') : emptyCatalogMessage}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
+		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${adminProducts.length} pieces</span></div><div class="clothing-grid">${adminProducts.length ? adminProducts.slice(0, maxHomeProducts).map(renderProductCard).join('') : emptyCatalogMessage}</div>${adminProducts.length > maxHomeProducts ? `<a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>` : ''}`;
 		catalogSections.appendChild(section);
 	});
 }
@@ -162,11 +162,13 @@ const adminTops = adminInventory.filter((item) => item.category === 'tops').map(
 const topsSection = document.querySelector('#tops');
 if (topsSection) {
 	if (adminTops.length) {
-		topsSection.querySelector('.clothing-grid')?.insertAdjacentHTML('beforeend', adminTops.map(renderProductCard).join(''));
+		topsSection.querySelector('.clothing-grid')?.insertAdjacentHTML('beforeend', adminTops.slice(0, maxHomeProducts).map(renderProductCard).join(''));
 		topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
 	} else {
 		topsSection.querySelector('.clothing-grid').innerHTML = emptyCatalogMessage;
 	}
+	const topsViewMore = topsSection.querySelector('.view-more-button');
+	if (topsViewMore) topsViewMore.hidden = adminTops.length <= maxHomeProducts;
 }
 
 const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)['"]?\)$/, '$1');

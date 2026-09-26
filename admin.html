@@ -26,6 +26,8 @@
                 <h2 id="product-form-title">Add an item</h2>
                 <form class="admin-form" id="product-form">
                     <input type="hidden" id="product-id">
+                    <input id="product-image" type="hidden">
+                    <label for="product-image-file">Item image from your computer<input id="product-image-file" accept="image/*" required type="file"></label>
                     <label for="product-name">Item name<input id="product-name" required type="text" placeholder="e.g. Linen resort shirt"></label>
                     <label for="product-category">Category<select id="product-category" required>
                         <option value="tops">Tops</option>
@@ -38,20 +40,12 @@
                     </select></label>
                     <label for="product-description">Description<textarea id="product-description" required placeholder="Short product description"></textarea></label>
                     <label>Sizes available
-                        <span class="admin-checks">
-                            <label><input type="checkbox" name="size" value="XS"> XS</label>
-                            <label><input type="checkbox" name="size" value="S"> S</label>
-                            <label><input type="checkbox" name="size" value="M"> M</label>
-                            <label><input type="checkbox" name="size" value="L"> L</label>
-                            <label><input type="checkbox" name="size" value="XL"> XL</label>
-                        </span>
+                        <span class="admin-checks" id="size-options"></span>
                     </label>
                     <label for="product-colors">Color available<input id="product-colors" required type="text" placeholder="e.g. Black, sand"></label>
                     <label for="product-price">Price in dollars<input id="product-price" required min="0" step="0.01" type="number" placeholder="96"></label>
                     <label for="product-stock">Total pieces<input id="product-stock" required min="0" step="1" type="number" value="1" placeholder="5"></label>
                     <label for="product-sold">Pieces sold<input id="product-sold" required min="0" step="1" type="number" value="0" placeholder="2"></label>
-                    <input id="product-image" type="hidden">
-                    <label for="product-image-file">Item image from your computer<input id="product-image-file" accept="image/*" required type="file"></label>
                     <label class="availability-toggle"><input id="product-available" checked type="checkbox"> Available for purchase</label>
                     <div class="admin-actions">
                         <button class="admin-primary" id="save-product" type="submit">Add item</button>
