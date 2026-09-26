@@ -159,3 +159,111 @@ using (
 ```
 
 After it succeeds, refresh the storefront and Admin. Customers choose Union Bank or OPay, make the transfer, and attach an image/PDF receipt at checkout. In Admin, open **View receipt** on the order to verify it, then update the order status to **Paid** after confirming the transfer.
+
+## 7. Allow deleting cancelled orders
+
+To enable the Admin delete button for cancelled orders, run this once in **SQL Editor → New query** in the same project:
+
+```sql
+grant delete on public.orders to authenticated;
+
+drop policy if exists "Store admin can delete orders" on public.orders;
+create policy "Store admin can delete orders"
+on public.orders for delete
+to authenticated
+using ((select auth.jwt() ->> 'email') = 'mrbabalola146@gmail.com');
+```
+
+The Admin page only shows **Delete cancelled order** after an order's status is set to **Cancelled**, and asks for confirmation before permanently deleting it.
+
+## 8. Update inventory when orders finish
+
+Run this once in **SQL Editor → New query** in the same project. When an order is set to **Completed**, ordered quantities are added to each product's sold count and products with no remaining stock become unavailable. If a completed order is changed to **Cancelled**, those quantities are released back into inventory. The operation is atomic and will not apply twice if an order status is retried.
+
+```sql
+alter table public.orders
+  add column if not exists inventory_applied boolean not null default false;
+
+create or replace function public.update_order_status_and_inventory(p_order_id text, p_status text)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_order public.orders%rowtype;
+  v_item jsonb;
+  v_product_id text;
+  v_match_count integer;
+  v_quantity integer;
+begin
+  if p_status not in ('New', 'Confirmed', 'Paid', 'Shipped', 'Completed', 'Cancelled') then
+    raise exception 'Invalid order status: %', p_status;
+  end if;
+
+  select * into v_order
+  from public.orders
+  where id = p_order_id
+  for update;
+
+  if not found then
+    raise exception 'Order % was not found', p_order_id;
+  end if;
+
+  if p_status = 'Completed' and not v_order.inventory_applied then
+    for v_item in select value from jsonb_array_elements(v_order.items)
+    loop
+      v_product_id := nullif(v_item ->> 'product_id', '');
+      if v_product_id is null then
+        select min(id), count(*) into v_product_id, v_match_count
+        from public.products
+        where name = v_item ->> 'name';
+        if v_match_count <> 1 then
+          raise exception 'Could not uniquely find product % for order %', v_item ->> 'name', p_order_id;
+        end if;
+      end if;
+
+      v_quantity := greatest(1, coalesce(nullif(v_item ->> 'quantity', '')::integer, 1));
+      update public.products
+      set sold = coalesce(sold, 0) + v_quantity,
+          available = available and (coalesce(sold, 0) + v_quantity < coalesce(stock, 0))
+      where id = v_product_id
+        and coalesce(sold, 0) + v_quantity <= coalesce(stock, 0);
+      if not found then
+        raise exception 'Product % has insufficient stock to complete order %', v_item ->> 'name', p_order_id;
+      end if;
+    end loop;
+
+    update public.orders set status = p_status, inventory_applied = true where id = p_order_id;
+  elsif p_status = 'Cancelled' and v_order.inventory_applied then
+    for v_item in select value from jsonb_array_elements(v_order.items)
+    loop
+      v_product_id := nullif(v_item ->> 'product_id', '');
+      if v_product_id is null then
+        select min(id), count(*) into v_product_id, v_match_count
+        from public.products
+        where name = v_item ->> 'name';
+        if v_match_count <> 1 then
+          raise exception 'Could not uniquely find product % for order %', v_item ->> 'name', p_order_id;
+        end if;
+      end if;
+
+      v_quantity := greatest(1, coalesce(nullif(v_item ->> 'quantity', '')::integer, 1));
+      update public.products
+      set sold = greatest(0, coalesce(sold, 0) - v_quantity),
+          available = greatest(0, coalesce(sold, 0) - v_quantity) < coalesce(stock, 0)
+      where id = v_product_id;
+    end loop;
+
+    update public.orders set status = p_status, inventory_applied = false where id = p_order_id;
+  else
+    update public.orders set status = p_status where id = p_order_id;
+  end if;
+end;
+$$;
+
+revoke all on function public.update_order_status_and_inventory(text, text) from public, anon;
+grant execute on function public.update_order_status_and_inventory(text, text) to authenticated;
+```
+
+Refresh the storefront and Admin after running this setup. A cancelled order that has not been completed does not reduce stock; completing it applies stock changes once.

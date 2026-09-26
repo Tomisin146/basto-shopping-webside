@@ -97,12 +97,13 @@ const renderOrders = () => {
         const itemRows = items.map((item) => `<li><span>${escapeHtml(item.name)} · ${escapeHtml(item.color)} · ${escapeHtml(item.size)} × ${Number(item.quantity) || 1}</span><strong>${formatPrice(item.line_total)}</strong></li>`).join('');
         const statusOptions = orderStatuses.map((option) => `<option${option === status ? ' selected' : ''}>${option}</option>`).join('');
         const paymentInfo = `<div class="admin-order-payment"><span>Payment: ${escapeHtml(order.payment_method || 'Not recorded')}</span>${order.receipt_path ? `<button class="admin-secondary" type="button" data-receipt="${escapeHtml(order.receipt_path)}">View receipt</button>` : '<span class="receipt-missing">No receipt attached</span>'}</div>`;
+        const deleteButton = status === 'Cancelled' ? `<button class="admin-danger" type="button" data-delete-order="${escapeHtml(order.id)}">Delete cancelled order</button>` : '';
         return `<article class="admin-order">
             <div class="admin-order-top"><div><p class="eyebrow">${escapeHtml(dateLabel)}</p><h3>${escapeHtml(order.id)}</h3></div><strong>${formatPrice(order.total)}</strong></div>
             <div class="admin-order-customer"><strong>${escapeHtml(order.customer_name)}</strong><a href="tel:${escapeHtml(order.phone)}">${escapeHtml(order.phone)}</a><p>${escapeHtml(order.address)}</p></div>
             <ul class="admin-order-items">${itemRows}</ul>
             ${paymentInfo}
-            <div class="admin-order-controls"><label>Status<select data-order-status data-id="${escapeHtml(order.id)}">${statusOptions}</select></label>${phoneDigits ? `<a class="admin-secondary" href="https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Hello ${order.customer_name}, about order ${order.id}.`)}" target="_blank" rel="noopener">Message customer</a>` : ''}</div>
+            <div class="admin-order-controls"><label>Status<select data-order-status data-id="${escapeHtml(order.id)}">${statusOptions}</select></label>${phoneDigits ? `<a class="admin-secondary" href="https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Hello ${order.customer_name}, about order ${order.id}.`)}" target="_blank" rel="noopener">Message customer</a>` : ''}${deleteButton}</div>
         </article>`;
     }).join('');
 };
@@ -121,20 +122,37 @@ orderSearch.addEventListener('input', renderOrders);
 orderStatusFilter.addEventListener('change', renderOrders);
 refreshOrdersButton.addEventListener('click', loadOrders);
 ordersList.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-receipt]');
-    if (!button) return;
-    const receiptWindow = window.open('about:blank', '_blank');
-    if (!receiptWindow) {
-        ordersStatus.textContent = 'Allow pop-ups to view this receipt.';
+    const receiptButton = event.target.closest('[data-receipt]');
+    if (receiptButton) {
+        const receiptWindow = window.open('about:blank', '_blank');
+        if (!receiptWindow) {
+            ordersStatus.textContent = 'Allow pop-ups to view this receipt.';
+            return;
+        }
+        receiptWindow.opener = null;
+        try {
+            const url = await inventoryApi.createPaymentReceiptUrl(receiptButton.dataset.receipt);
+            receiptWindow.location.href = url;
+        } catch (error) {
+            receiptWindow.close();
+            ordersStatus.textContent = error.message || 'Could not open the payment receipt.';
+        }
         return;
     }
-    receiptWindow.opener = null;
+    const deleteButton = event.target.closest('[data-delete-order]');
+    if (!deleteButton) return;
+    const order = orders.find((entry) => entry.id === deleteButton.dataset.deleteOrder);
+    if (!order || order.status !== 'Cancelled') return;
+    if (!window.confirm(`Permanently delete cancelled order ${order.id}? This cannot be undone.`)) return;
+    deleteButton.disabled = true;
     try {
-        const url = await inventoryApi.createPaymentReceiptUrl(button.dataset.receipt);
-        receiptWindow.location.href = url;
+        await inventoryApi.deleteOrder(order.id);
+        orders = orders.filter((entry) => entry.id !== order.id);
+        renderOrders();
+        ordersStatus.textContent = `Cancelled order ${order.id} deleted.`;
     } catch (error) {
-        receiptWindow.close();
-        ordersStatus.textContent = error.message || 'Could not open the payment receipt.';
+        deleteButton.disabled = false;
+        ordersStatus.textContent = error.message || 'Could not delete this order.';
     }
 });
 ordersList.addEventListener('change', async (event) => {

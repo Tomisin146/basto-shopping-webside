@@ -59,9 +59,16 @@
             return data || [];
         },
         async updateOrderStatus(id, status) {
+            const { error } = await requireClient().rpc('update_order_status_and_inventory', {
+                p_order_id: id,
+                p_status: status
+            });
+            if (error) throw error;
+        },
+        async deleteOrder(id) {
             const { error } = await requireClient()
                 .from('orders')
-                .update({ status })
+                .delete()
                 .eq('id', id);
             if (error) throw error;
         },

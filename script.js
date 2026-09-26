@@ -126,7 +126,7 @@ const categoryCatalog = [
 const renderProductCard = (product) => {
 	const remaining = Math.max(0, product.stock - product.sold);
 	const available = product.available && remaining > 0;
-	return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+	return `<article class="clothing-card" data-product-id="${escapeHtml(product.id || '')}" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
 };
 
 const catalogSections = document.querySelector('#catalog-sections');
@@ -135,6 +135,7 @@ if (catalogSections) {
 		const adminProducts = adminInventory
 			.filter((item) => item.category === category.id)
 			.map((item) => ({
+				id: item.id,
 				name: item.name,
 				details: `${item.description} · ${item.colors || 'Color not specified'}`,
 				price: Number(item.price),
@@ -155,6 +156,7 @@ if (catalogSections) {
 }
 
 const adminTops = adminInventory.filter((item) => item.category === 'tops').map((item) => ({
+	id: item.id,
 	name: item.name,
 	details: `${item.description} · ${item.colors || 'Color not specified'}`,
 	price: Number(item.price),
@@ -182,6 +184,7 @@ if (topsSection) {
 const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)['"]?\)$/, '$1');
 
 const getCardData = (card) => ({
+	productId: card.dataset.productId || '',
 	name: card.querySelector('h3').textContent,
 	color: card.querySelector('.clothing-details p').textContent.split('·').pop().trim(),
 	price: Number(card.querySelector('.clothing-details strong').textContent.replace(/[^0-9.]/g, '')),
@@ -444,6 +447,7 @@ if (checkoutForm) {
 			address: document.querySelector('#checkout-address').value.trim()
 		};
 		const items = cartItems.map((item) => ({
+			product_id: item.productId,
 			name: item.name,
 			color: item.color,
 			size: item.size,
