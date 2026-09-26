@@ -1,12 +1,5 @@
-const adminSessionKey = 'bastoAdminAuthenticated';
-if (sessionStorage.getItem(adminSessionKey) !== 'true') window.location.replace('admin-login.html');
-
+;(async () => {
 const inventoryStorageKey = 'bastoInventory';
-const inventoryResetKey = 'bastoInventoryReset2026';
-if (!localStorage.getItem(inventoryResetKey)) {
-    localStorage.removeItem(inventoryStorageKey);
-    localStorage.setItem(inventoryResetKey, 'true');
-}
 const categories = {
     tops: 'Tops',
     pants: 'Pants',
@@ -36,24 +29,33 @@ const formStatus = document.querySelector('#form-status');
 const inventoryList = document.querySelector('#inventory-list');
 const logoutButton = document.querySelector('#admin-logout');
 
-const readInventory = () => {
-    try {
-        const inventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
-        return Array.isArray(inventory) ? inventory : [];
-    } catch (error) {
-        localStorage.removeItem(inventoryStorageKey);
-        return [];
-    }
-};
+const inventoryApi = window.bastoInventoryApi;
+let inventory = [];
 
-let inventory = readInventory();
+if (!inventoryApi?.configured) {
+    formStatus.textContent = 'Connect this site to Supabase before managing inventory. See SUPABASE_SETUP.md.';
+    return;
+}
 
-logoutButton.addEventListener('click', () => {
-    sessionStorage.removeItem(adminSessionKey);
+const { data: sessionData } = await inventoryApi.client.auth.getSession();
+if (!sessionData.session) {
+    window.location.replace('admin-login.html');
+    return;
+}
+
+logoutButton.addEventListener('click', async () => {
+    await inventoryApi.client.auth.signOut();
     window.location.replace('admin-login.html');
 });
 
-const writeInventory = () => localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory));
+const readLegacyInventory = () => {
+    try {
+        const saved = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
+        return Array.isArray(saved) ? saved : [];
+    } catch (error) {
+        return [];
+    }
+};
 const makeId = () => window.crypto?.randomUUID?.() || `item-${Date.now()}`;
 const formatPrice = (amount) => `₦${Number(amount).toLocaleString('en-NG')}`;
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
@@ -161,14 +163,14 @@ form.addEventListener('submit', async (event) => {
             available: productAvailable.checked
         };
         const existingIndex = inventory.findIndex((entry) => entry.id === item.id);
+        await inventoryApi.saveProduct(item);
         if (existingIndex >= 0) inventory[existingIndex] = item;
         else inventory.unshift(item);
-        writeInventory();
         renderInventory();
         formStatus.textContent = existingIndex >= 0 ? 'Item updated.' : 'Item added to inventory.';
         resetForm();
     } catch (error) {
-        formStatus.textContent = 'Could not save this item. Try a smaller image file.';
+        formStatus.textContent = error.message || 'Could not save this item. Try a smaller image file.';
     } finally {
         saveButton.disabled = false;
     }
@@ -179,7 +181,7 @@ cancelEditButton.addEventListener('click', () => {
     formStatus.textContent = '';
 });
 
-inventoryList.addEventListener('click', (event) => {
+inventoryList.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-action]');
     if (!button) return;
     const itemIndex = inventory.findIndex((item) => item.id === button.dataset.id);
@@ -192,17 +194,40 @@ inventoryList.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'toggle') {
         item.available = !item.available;
-        writeInventory();
-        renderInventory();
-        formStatus.textContent = `${item.name} is now ${item.available ? 'available' : 'sold out'}.`;
+        try {
+            await inventoryApi.saveProduct(item);
+            renderInventory();
+            formStatus.textContent = `${item.name} is now ${item.available ? 'available' : 'sold out'}.`;
+        } catch (error) {
+            item.available = !item.available;
+            formStatus.textContent = error.message || 'Could not update this item.';
+        }
         return;
     }
     if (button.dataset.action === 'delete' && window.confirm(`Delete ${item.name}?`)) {
         inventory.splice(itemIndex, 1);
-        writeInventory();
-        renderInventory();
-        formStatus.textContent = 'Item deleted.';
+        try {
+            await inventoryApi.deleteProduct(item.id);
+            renderInventory();
+            formStatus.textContent = 'Item deleted.';
+        } catch (error) {
+            inventory.splice(itemIndex, 0, item);
+            formStatus.textContent = error.message || 'Could not delete this item.';
+        }
     }
 });
 
-renderInventory();
+try {
+    inventory = await inventoryApi.listProducts();
+    const legacyInventory = readLegacyInventory();
+    if (!inventory.length && legacyInventory.length) {
+        for (const item of legacyInventory) await inventoryApi.saveProduct(item);
+        inventory = await inventoryApi.listProducts();
+        localStorage.removeItem(inventoryStorageKey);
+        formStatus.textContent = 'Saved items from this browser to shared inventory.';
+    }
+    renderInventory();
+} catch (error) {
+    formStatus.textContent = error.message || 'Could not load shared inventory.';
+}
+})();

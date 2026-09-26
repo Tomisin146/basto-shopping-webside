@@ -1,20 +1,28 @@
-const adminSessionKey = 'bastoAdminAuthenticated';
-const adminUsername = 'bastostore';
-const adminPassword = 'BASTO146$$$';
 const loginForm = document.querySelector('#admin-login-form');
 const usernameInput = document.querySelector('#admin-username');
 const passwordInput = document.querySelector('#admin-password');
 const loginError = document.querySelector('#login-error');
+const inventoryApi = window.bastoInventoryApi;
 
-if (sessionStorage.getItem(adminSessionKey) === 'true') window.location.replace('admin.html');
+if (!inventoryApi?.configured) {
+    loginError.textContent = 'Connect this site to Supabase before signing in. See SUPABASE_SETUP.md.';
+} else {
+    inventoryApi.client.auth.getSession().then(({ data }) => {
+        if (data.session) window.location.replace('admin.html');
+    });
 
-loginForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (usernameInput.value.trim() !== adminUsername || passwordInput.value !== adminPassword) {
-        loginError.textContent = 'Incorrect username or password.';
-        passwordInput.select();
-        return;
-    }
-    sessionStorage.setItem(adminSessionKey, 'true');
-    window.location.replace('admin.html');
-});
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        loginError.textContent = '';
+        const { error } = await inventoryApi.client.auth.signInWithPassword({
+            email: usernameInput.value.trim(),
+            password: passwordInput.value
+        });
+        if (error) {
+            loginError.textContent = 'Sign-in failed. Check your email and password.';
+            passwordInput.select();
+            return;
+        }
+        window.location.replace('admin.html');
+    });
+}

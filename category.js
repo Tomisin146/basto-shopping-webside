@@ -1,3 +1,4 @@
+;(async () => {
 const whatsappNumber = '2347072305794';
 const cartStorageKey = 'bastoCart';
 let cartItems = [];
@@ -8,27 +9,34 @@ try {
 }
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
 const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
-const inventoryStorageKey = 'bastoInventory';
-const inventoryResetKey = 'bastoInventoryReset2026';
-if (!localStorage.getItem(inventoryResetKey)) {
-    localStorage.removeItem(inventoryStorageKey);
-    localStorage.setItem(inventoryResetKey, 'true');
-}
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
+const inventoryStorageKey = 'bastoInventory';
 let adminInventory = [];
+let inventoryLoadFailed = false;
 try {
-    const savedInventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
-    adminInventory = Array.isArray(savedInventory) ? savedInventory : [];
+    adminInventory = window.bastoInventoryApi?.configured
+        ? await window.bastoInventoryApi.listProducts()
+        : (() => {
+        try {
+            const savedInventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
+            return Array.isArray(savedInventory) ? savedInventory : [];
+        } catch (error) {
+            return [];
+        }
+    })();
 } catch (error) {
-    localStorage.removeItem(inventoryStorageKey);
+    console.error('Could not load shared inventory.', error);
+    inventoryLoadFailed = true;
 }
 
 const categoryId = window.location.pathname.split('/').pop().replace('.html', '');
 const categorySection = document.querySelector('.category-page');
 const categoryGrid = categorySection?.querySelector('.clothing-grid');
 if (categoryGrid) categoryGrid.innerHTML = '';
-const categoryItems = adminInventory.filter((item) => item.category === categoryId);
+const categoryItems = categoryId === 'new-arrivals'
+    ? adminInventory
+    : adminInventory.filter((item) => item.category === categoryId);
 if (categoryGrid && categoryItems.length) {
     categoryGrid.insertAdjacentHTML('beforeend', categoryItems.map((item) => {
         const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
@@ -38,7 +46,9 @@ if (categoryGrid && categoryItems.length) {
     if (categorySection) categorySection.querySelector('.catalog-count').textContent = `${categoryGrid.querySelectorAll('.clothing-card').length} pieces`;
 }
 if (categorySection && !categoryItems.length) categorySection.querySelector('.catalog-count').textContent = '0 pieces';
-if (categoryGrid && !categoryItems.length) categoryGrid.innerHTML = '<p class="catalog-empty">No items available in this category yet.</p>';
+if (categoryGrid && !categoryItems.length) categoryGrid.innerHTML = inventoryLoadFailed
+    ? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
+    : '<p class="catalog-empty">No items available in this category yet.</p>';
 
 const headerActions = document.querySelector('.header-actions');
 if (headerActions && !headerActions.querySelector('.cart-button')) {
@@ -257,3 +267,4 @@ window.addEventListener('pageshow', () => {
     sessionStorage.removeItem('bastoCheckoutPending');
     window.location.reload();
 });
+})();

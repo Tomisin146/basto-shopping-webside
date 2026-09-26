@@ -1,3 +1,4 @@
+;(async () => {
 const menuToggle = document.querySelector('.menu-toggle');
 const navigation = document.querySelector('.primary-navigation');
 const cartCount = document.querySelector('.cart-count');
@@ -27,13 +28,6 @@ try {
 }
 
 const whatsappNumber = '2347072305794';
-const inventoryStorageKey = 'bastoInventory';
-const inventoryResetKey = 'bastoInventoryReset2026';
-if (!localStorage.getItem(inventoryResetKey)) {
-	localStorage.removeItem(inventoryStorageKey);
-	localStorage.setItem(inventoryResetKey, 'true');
-}
-
 let selectedProduct = null;
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
 const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
@@ -48,7 +42,19 @@ const getInventory = () => {
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
-const adminInventory = getInventory();
+let adminInventory = [];
+let inventoryLoadFailed = false;
+try {
+	adminInventory = window.bastoInventoryApi?.configured
+		? await window.bastoInventoryApi.listProducts()
+		: getInventory();
+} catch (error) {
+	console.error('Could not load shared inventory.', error);
+	inventoryLoadFailed = true;
+}
+const emptyCatalogMessage = inventoryLoadFailed
+	? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
+	: '<p class="catalog-empty">No items available in this category yet.</p>';
 const maxHomeProducts = 10;
 document.querySelector('.new-arrivals .product-grid')?.replaceChildren();
 
@@ -135,7 +141,7 @@ if (catalogSections) {
 		const section = document.createElement('section');
 		section.className = 'clothing-section catalog-section';
 		section.id = category.id;
-		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${adminProducts.length} pieces</span></div><div class="clothing-grid">${adminProducts.length ? adminProducts.slice(0, maxHomeProducts).map(renderProductCard).join('') : '<p class="catalog-empty">No items available in this category yet.</p>'}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
+		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${adminProducts.length} pieces</span></div><div class="clothing-grid">${adminProducts.length ? adminProducts.slice(0, maxHomeProducts).map(renderProductCard).join('') : emptyCatalogMessage}</div><a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>`;
 		catalogSections.appendChild(section);
 	});
 }
@@ -159,7 +165,7 @@ if (topsSection) {
 		topsSection.querySelector('.clothing-grid')?.insertAdjacentHTML('beforeend', adminTops.map(renderProductCard).join(''));
 		topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
 	} else {
-		topsSection.querySelector('.clothing-grid').innerHTML = '<p class="catalog-empty">No items available in this category yet.</p>';
+		topsSection.querySelector('.clothing-grid').innerHTML = emptyCatalogMessage;
 	}
 }
 
@@ -417,3 +423,4 @@ if (searchInput) {
 if (searchBar) {
 	searchBar.addEventListener('submit', (event) => event.preventDefault());
 }
+})();

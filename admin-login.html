@@ -17,7 +17,7 @@
             <h1 id="login-title">Welcome back.</h1>
             <p class="admin-login-copy">Sign in to manage products, availability, and sold-out items.</p>
             <form class="admin-form" id="admin-login-form">
-                <label for="admin-username">Username<input id="admin-username" autocomplete="username" required type="text"></label>
+                <label for="admin-username">Email<input id="admin-username" autocomplete="username" required type="email"></label>
                 <label for="admin-password">Password<input id="admin-password" autocomplete="current-password" required type="password"></label>
                 <button class="admin-primary" type="submit">Sign in <span aria-hidden="true">-></span></button>
                 <p class="admin-login-error" id="login-error" role="alert"></p>
@@ -25,6 +25,9 @@
             <a class="admin-link" href="index.html">Back to storefront <span aria-hidden="true">-></span></a>
         </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-client.js"></script>
     <script src="admin-login.js"></script>
 </body>
 </html>
