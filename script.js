@@ -10,6 +10,7 @@ const modalPrice = document.querySelector('#product-modal-price');
 const modalDescription = document.querySelector('.modal-description');
 const productSize = document.querySelector('#product-size');
 const productQuantity = document.querySelector('#product-quantity');
+const productSizeLabel = document.querySelector('label[for="product-size"]');
 const modalAddButton = document.querySelector('#modal-add-to-cart');
 const cartDrawer = document.querySelector('#cart-drawer');
 const cartItemsElement = document.querySelector('#cart-items');
@@ -30,7 +31,6 @@ try {
 const whatsappNumber = '2347072305794';
 let selectedProduct = null;
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
-const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
 const getInventory = () => {
 	try {
 		const inventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
@@ -118,7 +118,7 @@ const categoryCatalog = [
 const renderProductCard = (product) => {
 	const remaining = Math.max(0, product.stock - product.sold);
 	const available = product.available && remaining > 0;
-	return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>$${product.price}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+	return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
 };
 
 const catalogSections = document.querySelector('#catalog-sections');
@@ -172,11 +172,6 @@ if (topsSection) {
 }
 
 const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)['"]?\)$/, '$1');
-
-document.querySelectorAll('.clothing-details strong, .product-card small').forEach((priceElement) => {
-	const originalPrice = Number(priceElement.textContent.replace(/[^0-9.]/g, ''));
-	if (originalPrice) priceElement.textContent = formatNaira(convertToNaira(originalPrice));
-});
 
 const getCardData = (card) => ({
 	name: card.querySelector('h3').textContent,
@@ -291,8 +286,10 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 		modalColor.textContent = card.dataset.color || getCardData(card).color;
 		modalPrice.textContent = card.querySelector('.clothing-details strong').textContent;
 		modalDescription.textContent = card.dataset.description || 'A considered Basto essential, designed for comfortable everyday wear and easy layering.';
-		const sizes = (card.dataset.sizes || 'XS|S|M|L|XL').split('|').filter(Boolean);
-		productSize.disabled = sizes.length === 1;
+		const sizes = card.hasAttribute('data-sizes') ? card.dataset.sizes.split('|').filter(Boolean) : ['XS', 'S', 'M', 'L', 'XL'];
+		productSizeLabel.hidden = sizes.length === 0;
+		productSize.hidden = sizes.length === 0;
+		productSize.disabled = sizes.length <= 1;
 		productSize.innerHTML = sizes.length === 1 ? `<option value="${sizes[0]}">${sizes[0]} available</option>` : '<option value="">Choose a size</option>';
 		sizes.forEach((size) => {
 			const option = document.createElement('option');
@@ -336,7 +333,7 @@ if (modalAddButton) {
 	modalAddButton.addEventListener('click', () => {
 		if (!selectedProduct) return;
 		if (selectedProduct.dataset.available === 'false') return;
-		const selectedSize = productSize ? productSize.value : '';
+		const selectedSize = productSize && !productSize.hidden ? productSize.value : '';
 		const requestedQuantity = Number(productQuantity.value) || 1;
 		const maximumQuantity = Number(productQuantity.max) || 1;
 		if (requestedQuantity > maximumQuantity) {
@@ -345,12 +342,12 @@ if (modalAddButton) {
 			return;
 		}
 		const quantity = Math.max(1, requestedQuantity);
-		if (!selectedSize) {
+		if (!productSize?.hidden && !selectedSize) {
 			productSize?.focus();
 			return;
 		}
 		const addButton = selectedProduct.querySelector('.add-to-cart');
-		addProductToCart(selectedProduct, selectedSize, quantity);
+		addProductToCart(selectedProduct, selectedSize || 'One size', quantity);
 		if (addButton) {
 			addButton.classList.add('added');
 			addButton.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';

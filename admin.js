@@ -12,12 +12,14 @@ const categories = {
 };
 const maxVisibleInventoryItems = 10;
 const expandedInventoryCategories = new Set();
+const categoriesWithoutSizes = new Set(['cosmetics', 'watch-accessories']);
 
 const form = document.querySelector('#product-form');
 const productId = document.querySelector('#product-id');
 const productName = document.querySelector('#product-name');
 const productCategory = document.querySelector('#product-category');
 const sizeOptions = document.querySelector('#size-options');
+const sizeField = document.querySelector('#size-field');
 const productDescription = document.querySelector('#product-description');
 const productColors = document.querySelector('#product-colors');
 const productPrice = document.querySelector('#product-price');
@@ -69,6 +71,12 @@ const safeImageSource = (value) => {
 };
 const selectedSizes = () => [...document.querySelectorAll('input[name="size"]:checked')].map((input) => input.value);
 const renderSizeOptions = (selected = []) => {
+    const hasSizes = !categoriesWithoutSizes.has(productCategory.value);
+    sizeField.hidden = !hasSizes;
+    if (!hasSizes) {
+        sizeOptions.replaceChildren();
+        return;
+    }
     const sizes = productCategory.value === 'shoes'
         ? Array.from({ length: 11 }, (_, index) => String(36 + index))
         : ['XS', 'S', 'M', 'L', 'XL'];

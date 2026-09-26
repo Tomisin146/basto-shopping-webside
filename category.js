@@ -8,7 +8,6 @@ try {
     localStorage.removeItem(cartStorageKey);
 }
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
-const convertToNaira = (amount) => 10000 + Math.min(Math.round(amount * 50), 10000);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
 const inventoryStorageKey = 'bastoInventory';
@@ -41,7 +40,7 @@ if (categoryGrid && categoryItems.length) {
     categoryGrid.insertAdjacentHTML('beforeend', categoryItems.map((item) => {
         const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
         const available = item.available !== false && remaining > 0;
-        return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml((item.sizes || []).join('|'))}" data-color="${escapeHtml(item.colors || 'Color not specified')}" data-available="${available}"><div class="clothing-image"${item.image ? ` style="background-image: url('${safeImageUrl(item.image)}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)} · ${escapeHtml(item.colors || 'Color not specified')}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>$${Number(item.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+        return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml((item.sizes || []).join('|'))}" data-color="${escapeHtml(item.colors || 'Color not specified')}" data-available="${available}"><div class="clothing-image"${item.image ? ` style="background-image: url('${safeImageUrl(item.image)}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)} · ${escapeHtml(item.colors || 'Color not specified')}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
     }).join(''));
     if (categorySection) categorySection.querySelector('.catalog-count').textContent = `${categoryGrid.querySelectorAll('.clothing-card').length} pieces`;
 }
@@ -79,11 +78,6 @@ if (!document.getElementById('product-modal')) {
 </aside>
 <div class="cart-backdrop" data-close-cart></div>`);
 }
-
-document.querySelectorAll('.clothing-details strong, .product-card small').forEach((priceElement) => {
-    const originalPrice = Number(priceElement.textContent.replace(/[^0-9.]/g, ''));
-    if (originalPrice) priceElement.textContent = formatNaira(convertToNaira(originalPrice));
-});
 
 const cartButton = document.querySelector('.cart-button');
 const cartCount = document.querySelector('.cart-count');
@@ -154,8 +148,11 @@ const openProductDetails = (card) => {
     document.querySelector('#product-modal-price').textContent = formatNaira(product.price);
     document.querySelector('.modal-description').textContent = card.dataset.description || 'A considered Basto Luxury & Wears essential, designed for comfortable everyday wear and easy layering.';
     const sizeSelect = document.querySelector('#product-size');
-    const sizes = (card.dataset.sizes || 'XS|S|M|L|XL').split('|').filter(Boolean);
-    sizeSelect.disabled = sizes.length === 1;
+    const sizes = card.hasAttribute('data-sizes') ? card.dataset.sizes.split('|').filter(Boolean) : ['XS', 'S', 'M', 'L', 'XL'];
+    const sizeLabel = document.querySelector('label[for="product-size"]');
+    sizeLabel.hidden = sizes.length === 0;
+    sizeSelect.hidden = sizes.length === 0;
+    sizeSelect.disabled = sizes.length <= 1;
     sizeSelect.innerHTML = sizes.length === 1 ? `<option value="${escapeHtml(sizes[0])}">${escapeHtml(sizes[0])} available</option>` : '<option value="">Choose a size</option>';
     sizes.forEach((size) => sizeSelect.insertAdjacentHTML('beforeend', `<option>${escapeHtml(size)}</option>`));
     const available = card.dataset.available !== 'false';
@@ -197,7 +194,7 @@ document.querySelectorAll('.add-to-cart').forEach((button) => {
             card.click();
             return;
         }
-        addToCart(card);
+        addToCart(card, card.hasAttribute('data-sizes') && !card.dataset.sizes ? 'One size' : 'M');
         button.classList.add('added');
         button.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
     });
@@ -234,11 +231,13 @@ if (cartItemsElement) {
 
 document.querySelector('#modal-add-to-cart')?.addEventListener('click', () => {
     if (selectedCard?.dataset.available === 'false') return;
-    const size = document.querySelector('#product-size')?.value;
-    if (!size || !selectedCard) {
+    const sizeSelect = document.querySelector('#product-size');
+    const size = sizeSelect && !sizeSelect.hidden ? sizeSelect.value : 'One size';
+    if (!sizeSelect?.hidden && !size) {
         document.querySelector('#product-size')?.focus();
         return;
     }
+    if (!selectedCard) return;
     const requestedQuantity = Number(productQuantity.value) || 1;
     const maximumQuantity = Number(productQuantity.max) || 1;
     if (requestedQuantity > maximumQuantity) {
