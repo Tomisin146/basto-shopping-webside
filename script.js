@@ -523,7 +523,7 @@ if (checkoutForm) {
 			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nDelivery address: ${customer.address}\n\nPlease confirm payment and delivery. Thank you.`;
 			sessionStorage.setItem('bastoCheckoutPending', 'true');
 			clearCart();
-			window.location.href = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
+			window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 		} catch (error) {
 			checkoutStatus.textContent = error.message || 'Could not save your order. Please try again or contact us on WhatsApp.';
 			placeOrderButton.disabled = false;

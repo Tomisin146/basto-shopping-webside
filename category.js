@@ -304,7 +304,7 @@ document.querySelector('#checkout-button')?.addEventListener('click', async () =
     const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | Qty: ${item.quantity || 1} | ${formatNaira(item.price * Number(item.quantity || 1))}`);
     const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0))}\n\nPayment options:\n1. Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears\n\n2. OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin\n\nPlease send your payment receipt to WhatsApp: +234 707 230 5794\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
     sessionStorage.setItem('bastoCheckoutPending', 'true');
-    window.location.href = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
+    window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 });
 
 window.addEventListener('pageshow', () => {
