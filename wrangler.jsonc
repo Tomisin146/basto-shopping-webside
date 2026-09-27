@@ -1,12 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "basto-website",
-  "routes": [
-    {
-      "pattern": "bastostore.com",
-      "custom_domain": true
-    }
-  ],
+  "name": "basto-shopping-webside",
   "compatibility_date": "2026-09-25",
   "observability": {
     "enabled": true
