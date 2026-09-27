@@ -66,22 +66,15 @@
     banner.hidden = true;
     banner.setAttribute('role', 'dialog');
     banner.setAttribute('aria-label', 'Analytics privacy choice');
-    banner.innerHTML = '<p>Allow Google Analytics cookies to help us measure store visits and shopping interactions. You can change this choice at any time.</p><div class="analytics-consent-actions"><button type="button" data-analytics-choice="reject">Reject</button><button type="button" data-analytics-choice="accept">Accept analytics</button></div>';
-
-    const settingsButton = document.createElement('button');
-    settingsButton.className = 'analytics-settings';
-    settingsButton.type = 'button';
-    settingsButton.textContent = 'Privacy settings';
-    document.body.append(banner, settingsButton);
+    banner.innerHTML = '<p>Allow Google Analytics cookies to help us measure store visits and shopping interactions.</p><div class="analytics-consent-actions"><button type="button" data-analytics-choice="reject">Reject</button><button type="button" data-analytics-choice="accept">Accept analytics</button></div>';
+    document.body.append(banner);
 
     const showConsent = () => {
         banner.hidden = false;
-        settingsButton.hidden = true;
     };
 
     const hideConsent = () => {
         banner.hidden = true;
-        settingsButton.hidden = false;
     };
 
     const clearAnalyticsCookies = () => {
@@ -106,8 +99,6 @@
         }
         hideConsent();
     });
-
-    settingsButton.addEventListener('click', showConsent);
 
     const previousConsent = readConsent();
     if (previousConsent === 'accepted') {

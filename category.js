@@ -40,7 +40,7 @@ if (categoryGrid && categoryItems.length) {
     categoryGrid.insertAdjacentHTML('beforeend', categoryItems.map((item) => {
         const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
         const available = item.available !== false && remaining > 0;
-        return `<article class="clothing-card" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml((item.sizes || []).join('|'))}" data-color="${escapeHtml(item.colors || 'Color not specified')}" data-available="${available}"><div class="clothing-image"${item.image ? ` style="background-image: url('${safeImageUrl(item.image)}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)} · ${escapeHtml(item.colors || 'Color not specified')}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+        return `<article class="clothing-card" data-product-id="${escapeHtml(item.id)}" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml((item.sizes || []).join('|'))}" data-color="${escapeHtml(item.colors || 'Color not specified')}" data-available="${available}"><div class="clothing-image"${item.image ? ` style="background-image: url('${safeImageUrl(item.image)}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)} · ${escapeHtml(item.colors || 'Color not specified')}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
     }).join(''));
     if (categorySection) categorySection.querySelector('.catalog-count').textContent = `${categoryGrid.querySelectorAll('.clothing-card').length} pieces`;
 }
@@ -87,9 +87,11 @@ const cartItemsElement = document.querySelector('#cart-items');
 const cartSubtotal = document.querySelector('#cart-subtotal');
 const cartBackdrop = document.querySelector('.cart-backdrop');
 const productQuantity = document.querySelector('#product-quantity');
+const checkoutButton = document.querySelector('#checkout-button');
 let selectedCard = null;
 
 const getProductData = (card) => ({
+	productId: card.dataset.productId || '',
     name: card.querySelector('h3').textContent,
     color: card.querySelector('.clothing-details p').textContent.split('·').pop().trim(),
     price: Number(card.querySelector('.clothing-details strong').textContent.replace(/[^0-9.]/g, '')),
@@ -100,11 +102,38 @@ const getProductData = (card) => ({
 const renderCart = () => {
     if (!cartItemsElement || !cartCount || !cartSubtotal || !cartButton) return;
     localStorage.setItem(cartStorageKey, JSON.stringify(cartItems));
-    cartItemsElement.innerHTML = cartItems.length ? cartItems.map((item, index) => { const quantity = Number(item.quantity || 1); const productQuantity = cartItems.filter((cartItem) => cartItem.name === item.name).reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0); const availableForItem = Number(item.stock || 1) - (productQuantity - quantity); return `<div class="cart-item"><div class="cart-item-image" style="background-image: ${item.image}"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p><div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button></div>`; }).join('') : '<p class="cart-empty">Your cart is empty.</p>';
+    cartItemsElement.innerHTML = cartItems.length ? cartItems.map((item, index) => { const quantity = Number(item.quantity || 1); const productStock = Number(item.stock ?? 1); const productQuantity = cartItems.filter((cartItem) => item.productId ? cartItem.productId === item.productId : cartItem.name === item.name).reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0); const availableForItem = productStock - (productQuantity - quantity); const stockMessage = item.available === false || productStock <= 0 ? '<small class="stock-status cart-stock-status">Sold out</small>' : productQuantity > productStock ? `<small class="stock-status cart-stock-status">Only ${productStock} pcs available</small>` : ''; return `<div class="cart-item"><div class="cart-item-image" style="background-image: ${item.image}"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p>${stockMessage}<div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button></div>`; }).join('') : '<p class="cart-empty">Your cart is empty.</p>';
+    if (checkoutButton) checkoutButton.disabled = hasUnavailableCartItems();
     const totalQuantity = cartItems.reduce((total, item) => total + Number(item.quantity || 1), 0);
     cartCount.textContent = String(totalQuantity);
     cartSubtotal.textContent = formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0));
     cartButton.setAttribute('aria-label', `Shopping cart, ${totalQuantity} items`);
+};
+
+const hasUnavailableCartItems = () => cartItems.some((item) => {
+    const productQuantity = cartItems
+        .filter((cartItem) => item.productId ? cartItem.productId === item.productId : cartItem.name === item.name)
+        .reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0);
+    return item.available === false || productQuantity > Number(item.stock ?? 1);
+});
+
+const refreshCartStock = async () => {
+    if (!window.bastoInventoryApi?.configured || !cartItems.length) return true;
+    const products = await window.bastoInventoryApi.listProducts();
+    cartItems.forEach((item) => {
+        const product = (item.productId && products.find((entry) => String(entry.id) === String(item.productId)))
+            || products.find((entry) => entry.name === item.name);
+        if (!product) {
+            item.stock = 0;
+            item.available = false;
+            return;
+        }
+        item.productId = product.id;
+        item.stock = Math.max(0, Number(product.stock ?? 0) - Number(product.sold ?? 0));
+        item.available = product.available !== false && item.stock > 0;
+    });
+    renderCart();
+    return !hasUnavailableCartItems();
 };
 
 renderCart();
@@ -206,7 +235,15 @@ document.querySelectorAll('[data-close-product]').forEach((control) => control.a
 }));
 
 document.querySelectorAll('[data-close-cart]').forEach((control) => control.addEventListener('click', () => setCartOpen(false)));
-if (cartButton) cartButton.addEventListener('click', () => setCartOpen(true));
+if (cartButton) cartButton.addEventListener('click', () => {
+    setCartOpen(true);
+    refreshCartStock().catch((error) => console.error('Could not refresh cart stock.', error));
+});
+window.setInterval(() => {
+    if (cartDrawer?.classList.contains('open')) {
+        refreshCartStock().catch((error) => console.error('Could not refresh cart stock.', error));
+    }
+}, 5000);
 
 if (cartItemsElement) {
     cartItemsElement.addEventListener('click', (event) => {
@@ -250,20 +287,30 @@ document.querySelector('#modal-add-to-cart')?.addEventListener('click', () => {
     document.querySelector('#modal-add-to-cart').textContent = 'Added to cart ✓';
 });
 
-document.querySelector('#checkout-button')?.addEventListener('click', () => {
+document.querySelector('#checkout-button')?.addEventListener('click', async () => {
     if (!cartItems.length) {
         window.alert('Your cart is empty. Add an item before checking out.');
+        return;
+    }
+    try {
+        if (!await refreshCartStock()) {
+            window.alert('One or more items in your cart are sold out or no longer available. Remove them to continue.');
+            return;
+        }
+    } catch (error) {
+        window.alert('Could not check current stock. Please try again.');
         return;
     }
     const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | Qty: ${item.quantity || 1} | ${formatNaira(item.price * Number(item.quantity || 1))}`);
     const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0))}\n\nPayment options:\n1. Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears\n\n2. OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin\n\nPlease send your payment receipt to WhatsApp: +234 707 230 5794\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
     sessionStorage.setItem('bastoCheckoutPending', 'true');
-    window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.location.href = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
 });
 
 window.addEventListener('pageshow', () => {
     if (sessionStorage.getItem('bastoCheckoutPending') !== 'true') return;
     sessionStorage.removeItem('bastoCheckoutPending');
-    window.location.reload();
+    localStorage.removeItem(cartStorageKey);
+    window.location.replace('index.html');
 });
 })();

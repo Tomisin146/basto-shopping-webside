@@ -201,22 +201,55 @@ const renderCart = () => {
 	} else {
 		cartItems.forEach((item, index) => {
 			const quantity = Number(item.quantity || 1);
+			const productStock = Number(item.stock ?? 1);
 			const productQuantity = cartItems
-				.filter((cartItem) => cartItem.name === item.name)
+				.filter((cartItem) => item.productId ? cartItem.productId === item.productId : cartItem.name === item.name)
 				.reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0);
-			const availableForItem = Number(item.stock || 1) - (productQuantity - quantity);
+			const availableForItem = productStock - (productQuantity - quantity);
+			const stockMessage = item.available === false || productStock <= 0
+				? '<small class="stock-status cart-stock-status">Sold out</small>'
+				: productQuantity > productStock
+					? `<small class="stock-status cart-stock-status">Only ${productStock} pcs available</small>`
+					: '';
 			const itemElement = document.createElement('div');
 			itemElement.className = 'cart-item';
-			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p><div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
+			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p>${stockMessage}<div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
 			const imageUrl = normalizeImageValue(item.image);
 			if (imageUrl) itemElement.querySelector('.cart-item-image').style.backgroundImage = `url("${imageUrl}")`;
 			cartItemsElement.appendChild(itemElement);
 		});
 	}
+	if (checkoutButton) checkoutButton.disabled = hasUnavailableCartItems();
 	const totalQuantity = cartItems.reduce((total, item) => total + Number(item.quantity || 1), 0);
 	cartCount.textContent = String(totalQuantity);
 	cartSubtotal.textContent = formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0));
 	cartButton.setAttribute('aria-label', `Shopping cart, ${totalQuantity} items`);
+};
+
+const hasUnavailableCartItems = () => cartItems.some((item) => {
+	const productQuantity = cartItems
+		.filter((cartItem) => item.productId ? cartItem.productId === item.productId : cartItem.name === item.name)
+		.reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0);
+	return item.available === false || productQuantity > Number(item.stock ?? 1);
+});
+
+const refreshCartStock = async () => {
+	if (!window.bastoInventoryApi?.configured || !cartItems.length) return true;
+	const products = await window.bastoInventoryApi.listProducts();
+	cartItems.forEach((item) => {
+		const product = (item.productId && products.find((entry) => String(entry.id) === String(item.productId)))
+			|| products.find((entry) => entry.name === item.name);
+		if (!product) {
+			item.stock = 0;
+			item.available = false;
+			return;
+		}
+		item.productId = product.id;
+		item.stock = Math.max(0, Number(product.stock ?? 0) - Number(product.sold ?? 0));
+		item.available = product.available !== false && item.stock > 0;
+	});
+	renderCart();
+	return !hasUnavailableCartItems();
 };
 
 renderCart();
@@ -367,7 +400,15 @@ if (modalAddButton) {
 	});
 }
 
-if (cartButton) cartButton.addEventListener('click', () => setCartOpen(true));
+if (cartButton) cartButton.addEventListener('click', () => {
+	setCartOpen(true);
+	refreshCartStock().catch((error) => console.error('Could not refresh cart stock.', error));
+});
+window.setInterval(() => {
+	if (cartDrawer?.classList.contains('open')) {
+		refreshCartStock().catch((error) => console.error('Could not refresh cart stock.', error));
+	}
+}, 5000);
 document.querySelectorAll('[data-close-cart]').forEach((control) => control.addEventListener('click', () => setCartOpen(false)));
 
 if (cartItemsElement) {
@@ -392,9 +433,18 @@ if (cartItemsElement) {
 }
 
 if (checkoutButton) {
-	checkoutButton.addEventListener('click', () => {
+	checkoutButton.addEventListener('click', async () => {
 		if (!cartItems.length) {
 			window.alert('Your cart is empty. Add an item before checking out.');
+			return;
+		}
+		try {
+			if (!await refreshCartStock()) {
+				window.alert('One or more items in your cart are sold out or no longer available. Remove them to continue.');
+				return;
+			}
+		} catch (error) {
+			window.alert('Could not check current stock. Please try again.');
 			return;
 		}
 		const subtotal = cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0);
@@ -473,7 +523,7 @@ if (checkoutForm) {
 			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nDelivery address: ${customer.address}\n\nPlease confirm payment and delivery. Thank you.`;
 			sessionStorage.setItem('bastoCheckoutPending', 'true');
 			clearCart();
-			window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+			window.location.href = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
 		} catch (error) {
 			checkoutStatus.textContent = error.message || 'Could not save your order. Please try again or contact us on WhatsApp.';
 			placeOrderButton.disabled = false;
@@ -485,6 +535,7 @@ window.addEventListener('pageshow', () => {
 	if (sessionStorage.getItem('bastoCheckoutPending') !== 'true') return;
 	sessionStorage.removeItem('bastoCheckoutPending');
 	clearCart();
+	window.location.replace('index.html');
 });
 
 if (searchInput) {
