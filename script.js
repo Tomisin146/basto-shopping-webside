@@ -28,6 +28,7 @@ const paymentAccount = document.querySelector('#payment-account');
 const searchInput = document.querySelector('#site-search');
 const searchBar = document.querySelector('.search-bar');
 const cartStorageKey = 'bastoCart';
+const inventoryStorageKey = 'bastoInventory';
 let cartItems = [];
 
 try {
@@ -39,6 +40,10 @@ try {
 const whatsappNumber = '2347072305794';
 let selectedProduct = null;
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
+document.querySelector('#tops .clothing-grid')?.insertAdjacentHTML('beforeend', '<p class="catalog-empty" role="status">Loading products...</p>');
+const topsCatalogCount = document.querySelector('#tops .catalog-count');
+if (topsCatalogCount) topsCatalogCount.textContent = 'Loading...';
+document.querySelector('#catalog-sections')?.insertAdjacentHTML('beforeend', '<p class="catalog-empty" role="status">Loading products...</p>');
 const getInventory = () => {
 	try {
 		const inventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
@@ -131,6 +136,7 @@ const renderProductCard = (product) => {
 
 const catalogSections = document.querySelector('#catalog-sections');
 if (catalogSections) {
+	catalogSections.replaceChildren();
 	categoryCatalog.forEach((category) => {
 		const adminProducts = adminInventory
 			.filter((item) => item.category === category.id)
@@ -171,11 +177,13 @@ const adminTops = adminInventory.filter((item) => item.category === 'tops').map(
 
 const topsSection = document.querySelector('#tops');
 if (topsSection) {
+	topsSection.querySelector('.clothing-grid')?.replaceChildren();
 	if (adminTops.length) {
 		topsSection.querySelector('.clothing-grid')?.insertAdjacentHTML('beforeend', adminTops.slice(0, maxHomeProducts).map(renderProductCard).join(''));
 		topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
 	} else {
 		topsSection.querySelector('.clothing-grid').innerHTML = emptyCatalogMessage;
+		topsSection.querySelector('.catalog-count').textContent = '0 pieces';
 	}
 	const topsViewMore = topsSection.querySelector('.view-more-button');
 	if (topsViewMore) topsViewMore.hidden = adminTops.length <= maxHomeProducts;
