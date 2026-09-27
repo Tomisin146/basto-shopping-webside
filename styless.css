@@ -4,7 +4,8 @@
 }
 * { box-sizing: border-box; } html { scroll-behavior: smooth; } body { margin: 0; color: var(--ink); background: var(--paper); font-family: var(--sans); }
 a { color: inherit; text-decoration: none; } button { font: inherit; cursor: pointer; } .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-.announcement { align-items: center; background: var(--ink); color: #ffffff; display: flex; font-size: 9px; gap: 9px; height: 33px; justify-content: center; letter-spacing: .12em; text-transform: uppercase; } .announcement span { color: var(--accent); font-size: 13px; }
+.announcement { align-items: center; background: var(--ink); color: #ffffff; display: flex; flex-wrap: wrap; font-size: 9px; gap: 4px 18px; height: auto; justify-content: center; letter-spacing: .08em; min-height: 33px; padding: 5px 12px; text-transform: uppercase; } .announcement span { color: var(--accent); font-size: 12px; }
+.announcement span + span::before { background: #ffffff; content: ""; display: inline-block; height: 12px; margin-right: 18px; vertical-align: middle; width: 1px; }
 .whatsapp-contact { border-bottom: 1px solid var(--accent); color: var(--accent); font-weight: 700; padding-bottom: 2px; }
 .analytics-consent { align-items: center; background: var(--paper); border: 1px solid var(--line); bottom: 16px; box-shadow: 0 8px 30px rgba(10,10,10,.18); display: flex; gap: 22px; justify-content: space-between; left: 16px; max-width: 720px; padding: 16px 18px; position: fixed; right: 16px; z-index: 20; }
 .analytics-consent[hidden] { display: none; }
@@ -156,7 +157,8 @@ body { overflow-x: hidden; }
     .cart-drawer { max-width: min(430px, 92vw); }
 }
 @media (max-width: 600px) {
-    .announcement { font-size: 7px; gap: 5px; letter-spacing: .04em; padding: 0 8px; text-align: center; }
+    .announcement { flex-direction: column; font-size: 7px; gap: 3px; letter-spacing: .04em; padding: 6px 8px; text-align: center; }
+    .announcement span + span::before { content: none; }
     .site-header { padding: 0 4vw 10px; }
     .header-top { height: 64px; }
     .header-left { gap: 8px; }
@@ -216,6 +218,9 @@ body { overflow-x: hidden; }
 .menu-toggle:hover { background: #f3e4be; border-color: var(--accent); }
 .menu-toggle span:not(.sr-only) { transition: width .2s; }
 .menu-toggle:hover span:not(.sr-only) { width: 17px; }
+.menu-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+.menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.menu-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
 .header-actions { gap: 10px; }
 .header-actions .icon-button { align-items: center; border: 1px solid var(--line); border-radius: 50%; display: inline-flex; height: 36px; justify-content: center; transition: background .2s, border-color .2s, color .2s; width: 36px; }
 .header-actions .icon-button:hover { background: var(--ink); border-color: var(--ink); color: var(--accent); }
@@ -430,4 +435,17 @@ body { overflow-x: hidden; }
 .hero-link-whatsapp { background: var(--ink); color: var(--paper); }
 .hero-location { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 20px 0 0; }
 .hero-location strong { color: var(--ink); font-weight: 600; }
+.coming-soon { align-items: center; background: var(--ink); color: var(--paper); display: grid; gap: 32px; grid-template-columns: minmax(0, 1fr) auto; min-height: 330px; overflow: hidden; padding: 64px 8vw; position: relative; scroll-margin-top: 150px; }
+.coming-soon::before { border: 1px solid rgba(201,151,46,.45); content: ""; inset: 16px; pointer-events: none; position: absolute; }
+.coming-soon-copy { position: relative; z-index: 1; }
+.coming-soon .eyebrow { color: var(--accent); font-size: 10px; letter-spacing: .14em; margin-bottom: 20px; text-transform: uppercase; }
+.coming-soon h2 { font-family: var(--serif); font-size: clamp(40px, 5vw, 72px); line-height: .98; margin: 0; }
+.coming-soon h2 em { color: var(--accent); font-weight: 500; }
+.coming-soon-copy > p:last-child { color: #e5e1d9; font-size: 14px; line-height: 1.6; margin: 22px 0 0; max-width: 420px; }
+.coming-soon-mark { color: transparent; font-size: clamp(70px, 12vw, 160px); font-weight: 700; line-height: .8; -webkit-text-stroke: 1px rgba(201,151,46,.75); }
+@media (max-width: 600px) {
+    .coming-soon { gap: 28px; grid-template-columns: 1fr; min-height: 0; padding: 52px 8vw; }
+    .coming-soon h2 { font-size: clamp(40px, 11vw, 58px); }
+    .coming-soon-mark { font-size: clamp(64px, 20vw, 100px); justify-self: end; }
+}
 
