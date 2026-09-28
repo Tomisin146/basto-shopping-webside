@@ -57,6 +57,27 @@
                 .getPublicUrl(path);
             return data.publicUrl;
         },
+        async uploadMigratedProductImage(file, productId) {
+            const safeProductId = String(productId).replace(/[^A-Za-z0-9_-]/g, '-');
+            const path = `products/migration/${safeProductId || 'item'}.jpg`;
+            const { error } = await requireClient()
+                .storage
+                .from('product-images')
+                .upload(path, file, { contentType: 'image/jpeg', upsert: true });
+            if (error) throw error;
+            const { data } = requireClient()
+                .storage
+                .from('product-images')
+                .getPublicUrl(path);
+            return data.publicUrl;
+        },
+        async updateProductImage(id, image) {
+            const { error } = await requireClient()
+                .from('products')
+                .update({ image })
+                .eq('id', id);
+            if (error) throw error;
+        },
         async deleteProduct(id) {
             const { error } = await requireClient().from('products').delete().eq('id', id);
             if (error) throw error;

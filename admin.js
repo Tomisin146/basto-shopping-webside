@@ -39,6 +39,9 @@ const orderSearch = document.querySelector('#order-search');
 const orderStatusFilter = document.querySelector('#order-status-filter');
 const refreshOrdersButton = document.querySelector('#refresh-orders');
 const logoutButton = document.querySelector('#admin-logout');
+const migrateProductImagesButton = document.querySelector('#migrate-product-images');
+const productImageMigrationStatus = document.querySelector('#product-image-migration-status');
+const productImageMigrationFailures = document.querySelector('#product-image-migration-failures');
 const orderStatuses = ['New', 'Confirmed', 'Paid', 'Shipped', 'Completed', 'Cancelled'];
 
 const inventoryApi = window.bastoInventoryApi;
@@ -75,6 +78,59 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const safeImageSource = (value) => {
     const image = String(value || '');
     return /^https?:\/\//i.test(image) || /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(image) ? image : '';
+};
+const isBase64Image = (value) => /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(String(value || ''));
+const isProductStorageUrl = (value) => /^https?:\/\/.*\/storage\/v1\/object\/(?:public|sign)\/product-images\//i.test(String(value || ''));
+const verifyProductImageUrl = async (url) => {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Image verification returned HTTP ${response.status}.`);
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().startsWith('image/')) throw new Error('Verified file is not an image.');
+    const imageBlob = await response.blob();
+    if (!imageBlob.size) throw new Error('Verified image is empty.');
+};
+const getAuthenticatedSession = async () => {
+    const { data: refreshedSession, error: refreshError } = await inventoryApi.client.auth.refreshSession();
+    if (refreshedSession.session) return refreshedSession.session;
+    const { data: currentSession, error: sessionError } = await inventoryApi.client.auth.getSession();
+    if (currentSession.session) return currentSession.session;
+    const errorMessage = refreshError?.message || sessionError?.message;
+    throw new Error(errorMessage
+        ? `No authenticated Supabase admin session is available. Sign in again before migrating images. (${errorMessage})`
+        : 'No authenticated Supabase admin session is available. Sign in again before migrating images.');
+};
+const migrateProductImages = async () => {
+    await getAuthenticatedSession();
+    const products = await inventoryApi.listProducts();
+    const legacyProducts = products.filter((item) => isBase64Image(item.image));
+    const skippedProducts = products.filter((item) => isProductStorageUrl(item.image));
+    const failures = [];
+    let completed = 0;
+    productImageMigrationFailures.replaceChildren();
+    productImageMigrationStatus.textContent = `Preparing ${legacyProducts.length} legacy images. Skipping ${skippedProducts.length} Storage image.`;
+    for (const item of legacyProducts) {
+        productImageMigrationStatus.textContent = `Migrating ${completed + 1} of ${legacyProducts.length}: ${item.name}`;
+        try {
+            await getAuthenticatedSession();
+            const imageBlob = await fetch(item.image).then((response) => {
+                if (!response.ok) throw new Error('Could not read the existing Base64 image.');
+                return response.blob();
+            });
+            const publicUrl = await inventoryApi.uploadMigratedProductImage(imageBlob, item.id);
+            await verifyProductImageUrl(publicUrl);
+            await inventoryApi.updateProductImage(item.id, publicUrl);
+            completed += 1;
+            productImageMigrationStatus.textContent = `Migrated ${completed} of ${legacyProducts.length}: ${item.name}`;
+        } catch (error) {
+            failures.push(`${item.name} (${item.id}): ${error.message || 'Migration failed.'}`);
+            productImageMigrationFailures.innerHTML = failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join('');
+        }
+    }
+    productImageMigrationStatus.textContent = failures.length
+        ? `Migration finished: ${completed} migrated, ${failures.length} failed, ${skippedProducts.length} skipped.`
+        : `Migration finished: ${completed} migrated, ${skippedProducts.length} skipped.`;
+    inventory = await inventoryApi.listProducts();
+    renderInventory();
 };
 const renderOrders = () => {
     const query = orderSearch.value.trim().toLowerCase();
@@ -382,6 +438,18 @@ inventoryList.addEventListener('click', async (event) => {
             inventory.splice(itemIndex, 0, item);
             formStatus.textContent = error.message || 'Could not delete this item.';
         }
+    }
+});
+
+migrateProductImagesButton.addEventListener('click', async () => {
+    if (!window.confirm('Migrate legacy Base64 product images to Storage?')) return;
+    migrateProductImagesButton.disabled = true;
+    try {
+        await migrateProductImages();
+    } catch (error) {
+        productImageMigrationStatus.textContent = error.message || 'Could not migrate product images.';
+    } finally {
+        migrateProductImagesButton.disabled = false;
     }
 });
 

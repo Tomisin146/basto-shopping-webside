@@ -74,7 +74,12 @@
             </section>
 
             <section class="admin-panel" aria-labelledby="inventory-title">
-                <h2 id="inventory-title">Your inventory</h2>
+                <div class="orders-heading">
+                    <div><h2 id="inventory-title">Your inventory</h2></div>
+                    <button class="admin-secondary" id="migrate-product-images" type="button">Migrate legacy images</button>
+                </div>
+                <p class="admin-status" id="product-image-migration-status" role="status"></p>
+                <ul class="admin-status" id="product-image-migration-failures"></ul>
                 <div class="admin-list" id="inventory-list"></div>
             </section>
         </div>
