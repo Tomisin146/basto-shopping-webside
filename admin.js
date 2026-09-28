@@ -202,7 +202,10 @@ const readImageFile = (file) => new Promise((resolve, reject) => {
             canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
             canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
             canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.82));
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Could not prepare the selected image.'));
+            }, 'image/jpeg', 0.82);
         });
         image.addEventListener('error', () => reject(new Error('The selected file is not a readable image.')));
         image.src = reader.result;
@@ -313,9 +316,10 @@ form.addEventListener('submit', async (event) => {
             price: Number(productPrice.value),
             stock: Number(productStock.value),
             sold: Number(productSold.value),
-            image: uploadedImage || productImage.value.trim(),
+            image: productImage.value.trim(),
             available: productAvailable.checked
         };
+        if (uploadedImage) item.image = await inventoryApi.uploadProductImage(uploadedImage, item.id);
         const existingIndex = inventory.findIndex((entry) => entry.id === item.id);
         await inventoryApi.saveProduct(item);
         if (existingIndex >= 0) inventory[existingIndex] = item;

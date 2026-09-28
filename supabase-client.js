@@ -42,6 +42,21 @@
             const { error } = await requireClient().from('products').upsert(record);
             if (error) throw error;
         },
+        async uploadProductImage(file, productId) {
+            const safeProductId = String(productId).replace(/[^A-Za-z0-9_-]/g, '-');
+            const fileId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const path = `products/${safeProductId || 'item'}-${fileId}.jpg`;
+            const { error } = await requireClient()
+                .storage
+                .from('product-images')
+                .upload(path, file, { contentType: 'image/jpeg', upsert: false });
+            if (error) throw error;
+            const { data } = requireClient()
+                .storage
+                .from('product-images')
+                .getPublicUrl(path);
+            return data.publicUrl;
+        },
         async deleteProduct(id) {
             const { error } = await requireClient().from('products').delete().eq('id', id);
             if (error) throw error;
