@@ -13,6 +13,8 @@ const categories = {
 const maxVisibleInventoryItems = 10;
 const expandedInventoryCategories = new Set();
 const categoriesWithoutSizes = new Set(['cosmetics', 'watch-accessories']);
+const clothingSizes = ['L', 'XL', '2XL', '3XL'];
+const numberSizes = Array.from({ length: 11 }, (_, index) => String(36 + index));
 
 const form = document.querySelector('#product-form');
 const productId = document.querySelector('#product-id');
@@ -21,7 +23,6 @@ const productCategory = document.querySelector('#product-category');
 const sizeOptions = document.querySelector('#size-options');
 const sizeField = document.querySelector('#size-field');
 const productDescription = document.querySelector('#product-description');
-const productColors = document.querySelector('#product-colors');
 const productPrice = document.querySelector('#product-price');
 const productStock = document.querySelector('#product-stock');
 const productSold = document.querySelector('#product-sold');
@@ -150,7 +151,7 @@ const renderOrders = () => {
         const dateLabel = Number.isNaN(createdAt.getTime()) ? 'Date unavailable' : createdAt.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
         const phoneDigits = String(order.phone || '').replace(/\D/g, '');
         const status = orderStatuses.includes(order.status) ? order.status : 'New';
-        const itemRows = items.map((item) => `<li><span>${escapeHtml(item.name)} · ${escapeHtml(item.color)} · ${escapeHtml(item.size)} × ${Number(item.quantity) || 1}</span><strong>${formatPrice(item.line_total)}</strong></li>`).join('');
+        const itemRows = items.map((item) => `<li><span>${escapeHtml(item.name)} · ${item.color ? `${escapeHtml(item.color)} · ` : ''}${escapeHtml(item.size)} × ${Number(item.quantity) || 1}</span><strong>${formatPrice(item.line_total)}</strong></li>`).join('');
         const statusOptions = orderStatuses.map((option) => `<option${option === status ? ' selected' : ''}>${option}</option>`).join('');
         const paymentInfo = `<div class="admin-order-payment"><span>Payment: ${escapeHtml(order.payment_method || 'Not recorded')}</span>${order.receipt_path ? `<button class="admin-secondary" type="button" data-receipt="${escapeHtml(order.receipt_path)}">View receipt</button>` : '<span class="receipt-missing">No receipt attached</span>'}</div>`;
         const deleteButton = status === 'Cancelled' ? `<button class="admin-danger" type="button" data-delete-order="${escapeHtml(order.id)}">Delete cancelled order</button>` : '';
@@ -237,10 +238,8 @@ const renderSizeOptions = (selected = []) => {
         sizeOptions.replaceChildren();
         return;
     }
-    const sizes = productCategory.value === 'shoes'
-        ? Array.from({ length: 11 }, (_, index) => String(36 + index))
-        : ['XS', 'S', 'M', 'L', 'XL'];
-    const selectedValues = selected.map(String);
+    const sizes = ['pants', 'shoes'].includes(productCategory.value) ? numberSizes : clothingSizes;
+    const selectedValues = selected.map(String).filter((size) => sizes.includes(size));
     sizeOptions.innerHTML = sizes.map((size) => `<label><input type="checkbox" name="size" value="${size}"${selectedValues.includes(size) ? ' checked' : ''}> ${size}</label>`).join('');
 };
 const readImageFile = (file) => new Promise((resolve, reject) => {
@@ -304,7 +303,7 @@ const renderInventory = () => {
         <div class="admin-item-image">${imageSource ? `<img src="${escapeHtml(imageSource)}" alt="${escapeHtml(item.name)}" loading="lazy">` : '<span>No image</span>'}</div>
         <div class="admin-item-details">
             <h3>${escapeHtml(item.name)}</h3>
-            <p>${escapeHtml(categories[item.category] || item.category)} · ${escapeHtml(item.colors)} · ${(item.sizes || []).length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
+            <p>${escapeHtml(categories[item.category] || item.category)} · ${(item.sizes || []).length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
         </div>
         <div class="admin-item-meta"><strong>${formatPrice(item.price)}</strong><span class="${item.available && remaining ? '' : 'sold-out-label'}">${item.available && remaining ? `${remaining} pcs left` : 'Sold out'}</span></div>
         <div class="admin-item-actions">
@@ -333,7 +332,6 @@ const startEdit = (item) => {
     localStorage.setItem(categoryPreferenceKey, item.category);
     renderSizeOptions(item.sizes || []);
     productDescription.value = item.description;
-    productColors.value = item.colors;
     productPrice.value = item.price;
     productStock.value = item.stock ?? 1;
     productSold.value = item.sold ?? 0;
@@ -341,7 +339,7 @@ const startEdit = (item) => {
     productImageFile.required = false;
     productAvailable.checked = item.available;
     document.querySelectorAll('input[name="size"]').forEach((input) => {
-        input.checked = item.sizes.includes(input.value);
+        input.checked = (item.sizes || []).map(String).includes(input.value);
     });
     saveButton.textContent = 'Update item';
     cancelEditButton.hidden = false;
@@ -368,7 +366,6 @@ form.addEventListener('submit', async (event) => {
             category: productCategory.value,
             description: productDescription.value.trim(),
             sizes: selectedSizes(),
-            colors: productColors.value.trim(),
             price: Number(productPrice.value),
             stock: Number(productStock.value),
             sold: Number(productSold.value),

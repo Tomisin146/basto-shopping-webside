@@ -32,7 +32,6 @@
                 category: item.category,
                 description: item.description,
                 sizes: item.sizes || [],
-                colors: item.colors,
                 price: Number(item.price),
                 stock: Number(item.stock),
                 sold: Number(item.sold),

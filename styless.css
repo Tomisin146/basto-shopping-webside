@@ -109,6 +109,8 @@ a { color: inherit; text-decoration: none; } button { font: inherit; cursor: poi
 .product-modal { align-items: center; display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 10; }
 .product-modal-backdrop { background: rgba(10,10,10,.64); inset: 0; position: absolute; }
 .product-modal-panel { background: var(--paper); max-width: 430px; padding: 42px; position: relative; width: 100%; z-index: 1; }
+.modal-product-image { aspect-ratio: 4 / 3; background: #f1f0ed; display: block; margin: 14px 0 20px; object-fit: contain; width: 100%; }
+.modal-product-image[hidden] { display: none; }
 .modal-close { background: transparent; border: 0; font-size: 27px; line-height: 1; padding: 0; position: absolute; right: 20px; top: 17px; }
 .product-modal-panel h2 { font-size: 39px; line-height: 1.05; max-width: 320px; }
 .modal-description { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 18px 0 24px; }

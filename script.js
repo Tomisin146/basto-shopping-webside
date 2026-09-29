@@ -5,8 +5,8 @@ const cartCount = document.querySelector('.cart-count');
 const cartButton = document.querySelector('.cart-button');
 const productModal = document.querySelector('#product-modal');
 const modalTitle = document.querySelector('#product-modal-title');
-const modalColor = document.querySelector('#product-modal-color');
 const modalPrice = document.querySelector('#product-modal-price');
+const modalImage = document.querySelector('#product-modal-image');
 const modalDescription = document.querySelector('.modal-description');
 const productSize = document.querySelector('#product-size');
 const productQuantity = document.querySelector('#product-quantity');
@@ -131,7 +131,14 @@ const categoryCatalog = [
 const renderProductCard = (product) => {
 	const remaining = Math.max(0, product.stock - product.sold);
 	const available = product.available && remaining > 0;
-	return `<article class="clothing-card" data-product-id="${escapeHtml(product.id || '')}" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-color="${escapeHtml(product.colors)}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+	return `<article class="clothing-card" data-product-id="${escapeHtml(product.id || '')}" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-image="${escapeHtml(product.image || '')}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+};
+
+const supportedSizesFor = (item) => {
+	const supportedSizes = ['pants', 'shoes'].includes(item.category)
+		? Array.from({ length: 11 }, (_, index) => String(36 + index))
+		: ['cosmetics', 'watch-accessories'].includes(item.category) ? [] : ['L', 'XL', '2XL', '3XL'];
+	return (item.sizes || []).map(String).filter((size) => supportedSizes.includes(size));
 };
 
 const catalogSections = document.querySelector('#catalog-sections');
@@ -143,15 +150,14 @@ if (catalogSections) {
 			.map((item) => ({
 				id: item.id,
 				name: item.name,
-				details: `${item.description} · ${item.colors || 'Color not specified'}`,
+				details: item.description,
 				price: Number(item.price),
 				image: safeImageUrl(item.image),
 				available: item.available !== false,
 				stock: Number(item.stock ?? 1),
 				sold: Number(item.sold ?? 0),
 				description: item.description,
-				sizes: item.sizes || [],
-				colors: item.colors || 'Color not specified'
+				sizes: supportedSizesFor(item),
 			}));
 		const section = document.createElement('section');
 		section.className = 'clothing-section catalog-section';
@@ -164,15 +170,14 @@ if (catalogSections) {
 const adminTops = adminInventory.filter((item) => item.category === 'tops').map((item) => ({
 	id: item.id,
 	name: item.name,
-	details: `${item.description} · ${item.colors || 'Color not specified'}`,
+	details: item.description,
 	price: Number(item.price),
 	image: safeImageUrl(item.image),
 	available: item.available !== false,
 	stock: Number(item.stock ?? 1),
 	sold: Number(item.sold ?? 0),
 	description: item.description,
-	sizes: item.sizes || [],
-	colors: item.colors || 'Color not specified'
+	sizes: supportedSizesFor(item),
 }));
 
 const topsSection = document.querySelector('#tops');
@@ -194,9 +199,8 @@ const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(
 const getCardData = (card) => ({
 	productId: card.dataset.productId || '',
 	name: card.querySelector('h3').textContent,
-	color: card.querySelector('.clothing-details p').textContent.split('·').pop().trim(),
 	price: Number(card.querySelector('.clothing-details strong').textContent.replace(/[^0-9.]/g, '')),
-	image: normalizeImageValue(card.querySelector('.clothing-image').style.backgroundImage || getComputedStyle(card.querySelector('.clothing-image')).backgroundImage),
+	image: card.dataset.image || normalizeImageValue(card.querySelector('.clothing-image').style.backgroundImage || getComputedStyle(card.querySelector('.clothing-image')).backgroundImage),
 	stock: Number(card.dataset.stock || 1)
 });
 
@@ -221,7 +225,7 @@ const renderCart = () => {
 					: '';
 			const itemElement = document.createElement('div');
 			itemElement.className = 'cart-item';
-			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>${item.color} · Size ${item.size}</p>${stockMessage}<div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
+			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>Size ${item.size}</p>${stockMessage}<div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
 			const imageUrl = normalizeImageValue(item.image);
 			if (imageUrl) itemElement.querySelector('.cart-item-image').style.backgroundImage = `url("${imageUrl}")`;
 			cartItemsElement.appendChild(itemElement);
@@ -319,11 +323,12 @@ document.querySelectorAll('.add-to-cart').forEach((button) => {
 	button.addEventListener('click', () => {
 		const card = button.closest('.clothing-card');
 		if (!card) return;
-		if (Number(card.dataset.stock || 1) > 1) {
+		const sizes = card.hasAttribute('data-sizes') ? card.dataset.sizes.split('|').filter(Boolean) : ['L', 'XL', '2XL', '3XL'];
+		if (Number(card.dataset.stock || 1) > 1 || sizes.length) {
 			card.click();
 			return;
 		}
-		addProductToCart(card);
+		addProductToCart(card, 'One size');
 		button.classList.add('added');
 		button.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
 	});
@@ -334,13 +339,18 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 	card.setAttribute('aria-label', `View details for ${card.querySelector('h3').textContent}`);
 
 	const openProductDetails = () => {
-		if (!modalTitle || !modalColor || !modalPrice || !modalDescription || !productSize || !productQuantity || !modalAddButton || !productModal) return;
+		if (!modalTitle || !modalPrice || !modalImage || !modalDescription || !productSize || !productQuantity || !modalAddButton || !productModal) return;
 		selectedProduct = card;
 		modalTitle.textContent = card.querySelector('h3').textContent;
-		modalColor.textContent = card.dataset.color || getCardData(card).color;
+		const imageSource = getCardData(card).image;
+		modalImage.hidden = !imageSource;
+		if (imageSource) {
+			modalImage.src = imageSource;
+			modalImage.alt = `${modalTitle.textContent} product image`;
+		}
 		modalPrice.textContent = card.querySelector('.clothing-details strong').textContent;
 		modalDescription.textContent = card.dataset.description || 'A considered Basto essential, designed for comfortable everyday wear and easy layering.';
-		const sizes = card.hasAttribute('data-sizes') ? card.dataset.sizes.split('|').filter(Boolean) : ['XS', 'S', 'M', 'L', 'XL'];
+		const sizes = card.hasAttribute('data-sizes') ? card.dataset.sizes.split('|').filter(Boolean) : ['L', 'XL', '2XL', '3XL'];
 		productSizeLabel.hidden = sizes.length === 0;
 		productSize.hidden = sizes.length === 0;
 		productSize.disabled = sizes.length <= 1;
@@ -509,7 +519,6 @@ if (checkoutForm) {
 		const items = cartItems.map((item) => ({
 			product_id: item.productId,
 			name: item.name,
-			color: item.color,
 			size: item.size,
 			quantity: Number(item.quantity || 1),
 			unit_price: Number(item.price || 0),
@@ -529,7 +538,7 @@ if (checkoutForm) {
 				receipt_path: receiptPath,
 				status: 'New'
 			});
-			const orderLines = items.map((item, index) => `${index + 1}. ${item.name} | Color: ${item.color} | Size: ${item.size} | Qty: ${item.quantity} | ${formatNaira(item.line_total)}`);
+			const orderLines = items.map((item, index) => `${index + 1}. ${item.name} | Size: ${item.size} | Qty: ${item.quantity} | ${formatNaira(item.line_total)}`);
 			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nDelivery address: ${customer.address}\n\nPlease confirm payment and delivery. Thank you.`;
 			sessionStorage.setItem('bastoCheckoutPending', 'true');
 			clearCart();
