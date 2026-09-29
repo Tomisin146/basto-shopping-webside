@@ -12,6 +12,7 @@ const imageViewerImage = document.querySelector('#product-image-viewer-image');
 const modalDescription = document.querySelector('.modal-description');
 const productSize = document.querySelector('#product-size');
 const productQuantity = document.querySelector('#product-quantity');
+const productStockStatus = document.querySelector('#product-stock-status');
 const productSizeLabel = document.querySelector('label[for="product-size"]');
 const modalAddButton = document.querySelector('#modal-add-to-cart');
 const cartDrawer = document.querySelector('#cart-drawer');
@@ -23,6 +24,10 @@ const checkoutModal = document.querySelector('#checkout-modal');
 const checkoutForm = document.querySelector('#checkout-form');
 const checkoutSummary = document.querySelector('#checkout-summary');
 const checkoutStatus = document.querySelector('#checkout-status');
+const checkoutFulfillment = document.querySelector('#checkout-fulfillment');
+const checkoutPaymentInstruction = document.querySelector('#checkout-payment-instruction');
+const checkoutAddressField = document.querySelector('#checkout-address-field');
+const checkoutAddress = document.querySelector('#checkout-address');
 const placeOrderButton = document.querySelector('#place-order');
 const checkoutPaymentMethod = document.querySelector('#checkout-payment-method');
 const checkoutReceipt = document.querySelector('#checkout-receipt');
@@ -176,6 +181,29 @@ const supportedSizesFor = (item) => {
 	return (item.sizes || []).map(String).filter((size) => supportedSizes.includes(size));
 };
 
+const homeNewArrivalsSection = document.querySelector('#home-new-arrivals');
+if (homeNewArrivalsSection) {
+	const newestProducts = adminInventory.slice(0, 6).map((item) => ({
+		id: item.id,
+		name: item.name,
+		category: item.category,
+		details: item.description,
+		price: Number(item.price),
+		image: safeImageUrl(item.image),
+		available: item.available !== false,
+		stock: Number(item.stock ?? 1),
+		sold: Number(item.sold ?? 0),
+		description: item.description,
+		subcategory: item.subcategory || '',
+		sizes: supportedSizesFor(item)
+	}));
+	const newArrivalsGrid = homeNewArrivalsSection.querySelector('.clothing-grid');
+	newArrivalsGrid.innerHTML = newestProducts.length
+		? newestProducts.map(renderProductCard).join('')
+		: emptyCatalogMessage;
+	bindProductCards(newArrivalsGrid);
+}
+
 const catalogSections = document.querySelector('#catalog-sections');
 if (catalogSections) {
 	catalogSections.replaceChildren();
@@ -279,10 +307,17 @@ const renderCart = () => {
 			itemElement.className = 'cart-item';
 			itemElement.innerHTML = `<div class="cart-item-image"></div><div><h3>${item.name}</h3><p>Size ${item.size}</p>${stockMessage}<div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button>`;
 			const imageUrl = normalizeImageValue(item.image);
-			if (imageUrl) itemElement.querySelector('.cart-item-image').style.backgroundImage = `url("${imageUrl}")`;
+			const cartImage = itemElement.querySelector('.cart-item-image');
+			cartImage.dataset.image = imageUrl;
+			if (imageUrl) cartImage.style.backgroundImage = `url("${imageUrl}")`;
 			cartItemsElement.appendChild(itemElement);
 		});
 	}
+	cartItemsElement.querySelectorAll('.cart-item-image').forEach((image) => {
+		image.setAttribute('role', 'button');
+		image.tabIndex = 0;
+		image.setAttribute('aria-label', `View larger image of ${image.closest('.cart-item')?.querySelector('h3')?.textContent || 'product'}`);
+	});
 	if (checkoutButton) checkoutButton.disabled = hasUnavailableCartItems();
 	const totalQuantity = cartItems.reduce((total, item) => total + Number(item.quantity || 1), 0);
 	cartCount.textContent = String(totalQuantity);
@@ -345,6 +380,24 @@ const addProductToCart = (card, size = 'M', quantity = 1) => {
 	}
 	renderCart();
 };
+
+const updateProductStockStatus = (card, showSelection = false) => {
+	const name = card.querySelector('h3').textContent;
+	const quantityInCart = cartItems
+		.filter((item) => item.name === name)
+		.reduce((total, item) => total + Number(item.quantity || 1), 0);
+	const availableStock = Math.max(0, Number(card.dataset.stock || 0) - quantityInCart);
+	const available = card.dataset.available !== 'false' && availableStock > 0;
+	productStockStatus.hidden = !available;
+	const selectedQuantity = Number(productQuantity.value) || 1;
+	productStockStatus.textContent = available
+		? `${availableStock} ${availableStock === 1 ? 'piece' : 'pieces'} left${showSelection && selectedQuantity > 1 ? ` (${selectedQuantity} selected)` : ''}`
+		: '';
+	return availableStock;
+};
+productQuantity.addEventListener('input', () => {
+	if (selectedProduct) updateProductStockStatus(selectedProduct, true);
+});
 
 const setCartOpen = (isOpen) => {
 	if (!cartDrawer || !cartBackdrop) return;
@@ -410,11 +463,12 @@ const wireProductCard = (card) => {
 		});
 		const available = card.dataset.available !== 'false';
 		productQuantity.max = String(card.dataset.stock || 1);
-		const quantityInCart = cartItems
+		const availableStock = Math.max(0, Number(card.dataset.stock || 0) - cartItems
 			.filter((item) => item.name === card.querySelector('h3').textContent)
-			.reduce((total, item) => total + Number(item.quantity || 1), 0);
-		productQuantity.max = String(Math.max(0, Number(card.dataset.stock || 1) - quantityInCart));
+			.reduce((total, item) => total + Number(item.quantity || 1), 0));
+		productQuantity.max = String(availableStock);
 		productQuantity.value = '1';
+		updateProductStockStatus(card);
 		productQuantity.disabled = !available || Number(productQuantity.max) < 1;
 		modalAddButton.disabled = !available || Number(productQuantity.max) < 1;
 		modalAddButton.textContent = available && Number(productQuantity.max) > 0 ? 'Add to cart +' : 'Sold out';
@@ -444,22 +498,39 @@ const closeImageViewer = () => {
 		document.body.classList.remove('modal-open');
 	}
 };
+const openImageViewer = (imageSource, productName) => {
+	if (!imageSource) return;
+	imageViewerImage.src = imageSource;
+	imageViewerImage.alt = `${productName || 'Product'} image`;
+	imageViewer.hidden = false;
+	document.body.classList.add('modal-open');
+};
 document.addEventListener('click', (event) => {
-	const imageTarget = event.target.closest('.clothing-image');
+	const previewImage = event.target.closest('.modal-product-image');
+	if (previewImage) {
+		const productName = previewImage.closest('.product-modal-panel')?.querySelector('h2')?.textContent;
+		openImageViewer(previewImage.currentSrc || previewImage.src, productName);
+		return;
+	}
+	const imageTarget = event.target.closest('.clothing-image, .cart-item-image');
 	if (imageTarget) {
 		const card = imageTarget.closest('.clothing-card');
-		const imageSource = getCardData(card).image;
-		if (!imageSource) return;
-		imageViewerImage.src = imageSource;
-		imageViewerImage.alt = `${card.querySelector('h3')?.textContent || 'Product'} image`;
-		imageViewer.hidden = false;
-		document.body.classList.add('modal-open');
+		const cartItem = imageTarget.closest('.cart-item');
+		const imageSource = card
+			? getCardData(card).image
+			: normalizeImageValue(imageTarget.dataset.image || getComputedStyle(imageTarget).backgroundImage);
+		openImageViewer(imageSource, card?.querySelector('h3')?.textContent || cartItem?.querySelector('h3')?.textContent);
 		return;
 	}
 	if (event.target === imageViewer || event.target.closest('[data-close-image-viewer]')) closeImageViewer();
 });
 document.addEventListener('keydown', (event) => {
 	if (event.key === 'Escape' && !imageViewer.hidden) closeImageViewer();
+	if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('.cart-item-image')) {
+		event.preventDefault();
+		const cartItem = event.target.closest('.cart-item');
+		openImageViewer(normalizeImageValue(event.target.dataset.image || getComputedStyle(event.target).backgroundImage), cartItem?.querySelector('h3')?.textContent);
+	}
 });
 
 document.addEventListener('click', (event) => {
@@ -510,6 +581,7 @@ if (modalAddButton) {
 		}
 		const addButton = selectedProduct.querySelector('.add-to-cart');
 		addProductToCart(selectedProduct, selectedSize || 'One size', quantity);
+		updateProductStockStatus(selectedProduct);
 		if (addButton) {
 			addButton.classList.add('added');
 			addButton.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
@@ -581,6 +653,18 @@ const renderPaymentAccount = () => {
 		? 'OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin'
 		: 'Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears';
 };
+const deliveryPaymentInstruction = 'Please pay the total amount shown above and send your payment receipt to BASTO on WhatsApp. BASTO will arrange your delivery after payment confirmation.';
+const pickupPaymentInstruction = 'Please pay the total amount shown above and send your payment receipt to BASTO on WhatsApp. BASTO will confirm your pickup after payment confirmation. No delivery will be arranged for this order.';
+const updateCheckoutFulfillment = () => {
+	const isPickup = checkoutFulfillment.value === 'pickup';
+	checkoutAddressField.hidden = isPickup;
+	checkoutAddress.disabled = isPickup;
+	checkoutAddress.required = !isPickup;
+	if (isPickup) checkoutAddress.value = '';
+	checkoutPaymentInstruction.textContent = isPickup ? pickupPaymentInstruction : deliveryPaymentInstruction;
+};
+checkoutFulfillment.addEventListener('change', updateCheckoutFulfillment);
+updateCheckoutFulfillment();
 checkoutPaymentMethod.addEventListener('change', renderPaymentAccount);
 renderPaymentAccount();
 
@@ -609,10 +693,11 @@ if (checkoutForm) {
 		placeOrderButton.disabled = true;
 		checkoutStatus.textContent = 'Uploading receipt and saving your order...';
 		const orderReference = `BST-${Date.now().toString(36).toUpperCase()}`;
+		const isPickup = checkoutFulfillment.value === 'pickup';
 		const customer = {
 			name: document.querySelector('#checkout-name').value.trim(),
 			phone: document.querySelector('#checkout-phone').value.trim(),
-			address: document.querySelector('#checkout-address').value.trim()
+			address: isPickup ? 'PICKUP - CUSTOMER WILL COLLECT; NO DELIVERY REQUIRED' : checkoutAddress.value.trim()
 		};
 		const items = cartItems.map((item) => ({
 			product_id: item.productId,
@@ -637,7 +722,11 @@ if (checkoutForm) {
 				status: 'New'
 			});
 			const orderLines = items.map((item, index) => `${index + 1}. ${item.name} | Size: ${item.size} | Qty: ${item.quantity} | ${formatNaira(item.line_total)}`);
-			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nDelivery address: ${customer.address}\n\nPlease confirm payment and delivery. Thank you.`;
+			const orderType = isPickup ? 'PICKUP ORDER' : 'DELIVERY ORDER';
+			const fulfillmentDetails = isPickup
+				? 'The customer will come to BASTO for pickup. BASTO must NOT arrange delivery.'
+				: `Delivery address: ${customer.address}`;
+			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderType}\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\n${checkoutPaymentInstruction.textContent}\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\n${fulfillmentDetails}\n\nPlease confirm payment. Thank you.`;
 			sessionStorage.setItem('bastoCheckoutPending', 'true');
 			clearCart();
 			window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;

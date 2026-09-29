@@ -127,6 +127,7 @@ if (!document.getElementById('product-modal')) {
         <select id="product-size"><option value="">Choose a size</option><option>L</option><option>XL</option><option>2XL</option><option>3XL</option></select>
         <label class="size-label" for="product-quantity">Quantity</label>
         <input id="product-quantity" type="number" min="1" value="1">
+        <small class="stock-status" id="product-stock-status" role="status" hidden></small>
         <button class="modal-add" type="button" id="modal-add-to-cart">Add to cart <span aria-hidden="true">+</span></button>
     </section>
 </div>
@@ -142,6 +143,13 @@ if (!document.getElementById('product-modal')) {
 <div class="cart-backdrop" data-close-cart></div>`);
 }
 
+const cartDrawerFooter = document.querySelector('.cart-drawer-footer');
+cartDrawerFooter?.querySelector(':scope > div')?.insertAdjacentHTML('afterend', `
+<label class="cart-fulfillment-label" for="cart-fulfillment">Fulfillment
+    <select id="cart-fulfillment"><option value="delivery">Delivery</option><option value="pickup">Pickup</option></select>
+</label>
+<p class="checkout-payment-instruction" id="cart-payment-instruction"></p>`);
+
 const cartButton = document.querySelector('.cart-button');
 const cartCount = document.querySelector('.cart-count');
 const productModal = document.querySelector('#product-modal');
@@ -153,7 +161,10 @@ const cartItemsElement = document.querySelector('#cart-items');
 const cartSubtotal = document.querySelector('#cart-subtotal');
 const cartBackdrop = document.querySelector('.cart-backdrop');
 const productQuantity = document.querySelector('#product-quantity');
+const productStockStatus = document.querySelector('#product-stock-status');
 const checkoutButton = document.querySelector('#checkout-button');
+const cartFulfillment = document.querySelector('#cart-fulfillment');
+const cartPaymentInstruction = document.querySelector('#cart-payment-instruction');
 let selectedCard = null;
 
 const getProductData = (card) => ({
@@ -168,6 +179,12 @@ const renderCart = () => {
     if (!cartItemsElement || !cartCount || !cartSubtotal || !cartButton) return;
     localStorage.setItem(cartStorageKey, JSON.stringify(cartItems));
     cartItemsElement.innerHTML = cartItems.length ? cartItems.map((item, index) => { const quantity = Number(item.quantity || 1); const productStock = Number(item.stock ?? 1); const productQuantity = cartItems.filter((cartItem) => item.productId ? cartItem.productId === item.productId : cartItem.name === item.name).reduce((total, cartItem) => total + Number(cartItem.quantity || 1), 0); const availableForItem = productStock - (productQuantity - quantity); const stockMessage = item.available === false || productStock <= 0 ? '<small class="stock-status cart-stock-status">Sold out</small>' : productQuantity > productStock ? `<small class="stock-status cart-stock-status">Only ${productStock} pcs available</small>` : ''; return `<div class="cart-item"><div class="cart-item-image" style="background-image: ${item.image}"></div><div><h3>${item.name}</h3><p>Size ${item.size}</p>${stockMessage}<div class="cart-quantity"><button type="button" aria-label="Decrease ${item.name} quantity" data-change-quantity="-1" data-item-index="${index}">−</button><span>${quantity} pcs</span><button type="button" aria-label="Increase ${item.name} quantity" data-change-quantity="1" data-item-index="${index}"${quantity >= availableForItem ? ' disabled' : ''}>+</button></div></div><strong>${formatNaira(item.price * quantity)}</strong><button type="button" aria-label="Remove ${item.name}" data-remove-item="${index}">×</button></div>`; }).join('') : '<p class="cart-empty">Your cart is empty.</p>';
+    cartItemsElement.querySelectorAll('.cart-item-image').forEach((image, index) => {
+        image.dataset.image = cartItems[index]?.image || '';
+        image.setAttribute('role', 'button');
+        image.tabIndex = 0;
+        image.setAttribute('aria-label', `View larger image of ${image.closest('.cart-item')?.querySelector('h3')?.textContent || 'product'}`);
+    });
     if (checkoutButton) checkoutButton.disabled = hasUnavailableCartItems();
     const totalQuantity = cartItems.reduce((total, item) => total + Number(item.quantity || 1), 0);
     cartCount.textContent = String(totalQuantity);
@@ -224,6 +241,24 @@ const addToCart = (card, size = 'M', quantity = 1) => {
     renderCart();
 };
 
+const updateProductStockStatus = (card, showSelection = false) => {
+    const name = card.querySelector('h3').textContent;
+    const quantityInCart = cartItems
+        .filter((item) => item.name === name)
+        .reduce((total, item) => total + Number(item.quantity || 1), 0);
+    const availableStock = Math.max(0, Number(card.dataset.stock || 0) - quantityInCart);
+    const available = card.dataset.available !== 'false' && availableStock > 0;
+    productStockStatus.hidden = !available;
+    const selectedQuantity = Number(productQuantity.value) || 1;
+    productStockStatus.textContent = available
+        ? `${availableStock} ${availableStock === 1 ? 'piece' : 'pieces'} left${showSelection && selectedQuantity > 1 ? ` (${selectedQuantity} selected)` : ''}`
+        : '';
+    return availableStock;
+};
+productQuantity.addEventListener('input', () => {
+    if (selectedCard) updateProductStockStatus(selectedCard, true);
+});
+
 const setCartOpen = (isOpen) => {
     if (!cartDrawer || !cartBackdrop) return;
     cartDrawer.classList.toggle('open', isOpen);
@@ -254,11 +289,12 @@ const openProductDetails = (card) => {
     sizeSelect.innerHTML = sizes.length === 1 ? `<option value="${escapeHtml(sizes[0])}">${escapeHtml(sizes[0])} available</option>` : '<option value="">Choose a size</option>';
     sizes.forEach((size) => sizeSelect.insertAdjacentHTML('beforeend', `<option>${escapeHtml(size)}</option>`));
     const available = card.dataset.available !== 'false';
-    const quantityInCart = cartItems
+    const availableStock = Math.max(0, Number(card.dataset.stock || 0) - cartItems
         .filter((item) => item.name === product.name)
-        .reduce((total, item) => total + Number(item.quantity || 1), 0);
-    productQuantity.max = String(Math.max(0, Number(card.dataset.stock || 1) - quantityInCart));
+        .reduce((total, item) => total + Number(item.quantity || 1), 0));
+    productQuantity.max = String(availableStock);
     productQuantity.value = '1';
+    updateProductStockStatus(card);
     productQuantity.disabled = !available || Number(productQuantity.max) < 1;
     const modalAddButton = document.querySelector('#modal-add-to-cart');
     modalAddButton.disabled = !available || Number(productQuantity.max) < 1;
@@ -308,22 +344,38 @@ const closeImageViewer = () => {
         document.body.classList.remove('modal-open');
     }
 };
+const openImageViewer = (imageSource, productName) => {
+    if (!imageSource) return;
+    imageViewerImage.src = imageSource;
+    imageViewerImage.alt = `${productName || 'Product'} image`;
+    imageViewer.hidden = false;
+    document.body.classList.add('modal-open');
+};
 document.addEventListener('click', (event) => {
-    const imageTarget = event.target.closest('.clothing-image');
+    const previewImage = event.target.closest('.modal-product-image');
+    if (previewImage) {
+        const productName = previewImage.closest('.product-modal-panel')?.querySelector('h2')?.textContent;
+        openImageViewer(previewImage.currentSrc || previewImage.src, productName);
+        return;
+    }
+    const imageTarget = event.target.closest('.clothing-image, .cart-item-image');
     if (imageTarget) {
         const card = imageTarget.closest('.clothing-card');
-        const imageSource = card?.dataset.image || '';
-        if (!imageSource) return;
-        imageViewerImage.src = imageSource;
-        imageViewerImage.alt = `${card.querySelector('h3')?.textContent || 'Product'} image`;
-        imageViewer.hidden = false;
-        document.body.classList.add('modal-open');
+        const cartItem = imageTarget.closest('.cart-item');
+        const imageSource = card?.dataset.image || (imageTarget.dataset.image || getComputedStyle(imageTarget).backgroundImage).replace(/^url\(["']?(.*?)['"]?\)$/, '$1');
+        openImageViewer(imageSource, card?.querySelector('h3')?.textContent || cartItem?.querySelector('h3')?.textContent);
         return;
     }
     if (event.target === imageViewer || event.target.closest('[data-close-image-viewer]')) closeImageViewer();
 });
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !imageViewer.hidden) closeImageViewer();
+    if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('.cart-item-image')) {
+        event.preventDefault();
+        const cartItem = event.target.closest('.cart-item');
+        const imageSource = (event.target.dataset.image || getComputedStyle(event.target).backgroundImage).replace(/^url\(["']?(.*?)['"]?\)$/, '$1');
+        openImageViewer(imageSource, cartItem?.querySelector('h3')?.textContent);
+    }
 });
 
 categoryFilters?.addEventListener('click', (event) => {
@@ -346,6 +398,13 @@ document.querySelectorAll('[data-close-product]').forEach((control) => control.a
 }));
 
 document.querySelectorAll('[data-close-cart]').forEach((control) => control.addEventListener('click', () => setCartOpen(false)));
+const deliveryPaymentInstruction = 'Please pay the total amount shown above and send your payment receipt to BASTO on WhatsApp. BASTO will arrange your delivery after payment confirmation.';
+const pickupPaymentInstruction = 'Please pay the total amount shown above and send your payment receipt to BASTO on WhatsApp. BASTO will confirm your pickup after payment confirmation. No delivery will be arranged for this order.';
+const updateCartPaymentInstruction = () => {
+    cartPaymentInstruction.textContent = cartFulfillment.value === 'pickup' ? pickupPaymentInstruction : deliveryPaymentInstruction;
+};
+cartFulfillment.addEventListener('change', updateCartPaymentInstruction);
+updateCartPaymentInstruction();
 if (cartButton) cartButton.addEventListener('click', () => {
     setCartOpen(true);
     refreshCartStock().catch((error) => console.error('Could not refresh cart stock.', error));
@@ -395,6 +454,7 @@ document.querySelector('#modal-add-to-cart')?.addEventListener('click', () => {
     }
     const quantity = Math.max(1, requestedQuantity);
     addToCart(selectedCard, size, quantity);
+    updateProductStockStatus(selectedCard);
     document.querySelector('#modal-add-to-cart').textContent = 'Added to cart ✓';
 });
 
@@ -413,7 +473,15 @@ document.querySelector('#checkout-button')?.addEventListener('click', async () =
         return;
     }
     const orderLines = cartItems.map((item, index) => `${index + 1}. ${item.name} | Size: ${item.size} | Qty: ${item.quantity || 1} | ${formatNaira(item.price * Number(item.quantity || 1))}`);
-    const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0))}\n\nPayment options:\n1. Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears\n\n2. OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin\n\nPlease send your payment receipt to WhatsApp: +234 707 230 5794\n\nCustomer name:\nPhone number:\nDelivery address:\n\nThank you.`;
+    const isPickup = cartFulfillment.value === 'pickup';
+    const orderType = isPickup ? 'PICKUP ORDER' : 'DELIVERY ORDER';
+    const fulfillmentDetails = isPickup
+        ? 'The customer will come to BASTO for pickup. BASTO must NOT arrange delivery.'
+        : 'The customer selected delivery. Please arrange delivery with the customer.';
+    const customerDetails = isPickup
+        ? 'Customer name:\nPhone number:\nPickup: customer will come to collect. No delivery address is required.'
+        : 'Customer name:\nPhone number:\nDelivery address:';
+    const message = `Hello Basto Luxury & Wears, I would like to place this order:\n\n${orderType}\n\n${orderLines.join('\n')}\n\nSubtotal: ${formatNaira(cartItems.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 1), 0))}\n\n${fulfillmentDetails}\n\n${cartPaymentInstruction.textContent}\n\nPayment options:\n1. Union Bank\nAccount number: 0221002585\nAccount name: Bato Luxury and Wears\n\n2. OPay\nAccount number: 7072305794\nAccount name: Babalola Oluwatosin\n\nPlease send your payment receipt to WhatsApp: +234 707 230 5794\n\n${customerDetails}\n\nThank you.`;
     sessionStorage.setItem('bastoCheckoutPending', 'true');
     window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 });

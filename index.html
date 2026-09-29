@@ -55,6 +55,29 @@
             </div>
         </section>
 
+        <section class="clothing-section" id="home-new-arrivals" aria-labelledby="home-new-arrivals-title">
+            <div class="section-heading">
+                <div><p class="eyebrow">Just landed</p><h2 id="home-new-arrivals-title">New Arrivals</h2></div>
+            </div>
+            <div class="clothing-grid"></div>
+            <a class="view-more-button" href="new-arrivals.html">View All <span aria-hidden="true">→</span></a>
+        </section>
+
+        <section class="clothing-section" aria-labelledby="shop-by-category-title">
+            <div class="section-heading">
+                <div><h2 id="shop-by-category-title">Shop by Category</h2></div>
+            </div>
+            <nav class="category-navigation" aria-label="Shop by category">
+                <a href="tops.html"><span>Tops</span></a>
+                <a href="pants.html"><span>Trousers</span></a>
+                <a href="shoes.html"><span>Shoes</span></a>
+                <a href="watch-accessories.html"><span>Watch &amp; accessories</span></a>
+                <a href="cap.html"><span>Cap</span></a>
+                <a href="cosmetics.html"><span>Cosmetics</span></a>
+                <a href="undies.html"><span>Undies</span></a>
+            </nav>
+        </section>
+
         <!-- Clothing Section -->
         <section class="clothing-section" id="tops">
             <div class="section-heading">
@@ -93,6 +116,7 @@
                 </select>
                 <label class="size-label" for="product-quantity">Quantity</label>
                 <input id="product-quantity" type="number" min="1" value="1">
+                <small class="stock-status" id="product-stock-status" role="status" hidden></small>
                 <button class="modal-add" type="button" id="modal-add-to-cart">Add to cart <span aria-hidden="true">+</span></button>
             </section>
         </div>
@@ -116,10 +140,12 @@
                 <p class="eyebrow">Delivery details</p>
                 <h2 id="checkout-title">Where should we send it?</h2>
                 <p class="checkout-summary" id="checkout-summary"></p>
+                <p class="checkout-payment-instruction" id="checkout-payment-instruction">Please pay the total amount shown above and send your payment receipt to BASTO on WhatsApp. BASTO will arrange your delivery after payment confirmation.</p>
                 <form class="checkout-form" id="checkout-form">
+                    <label for="checkout-fulfillment">Fulfillment<select id="checkout-fulfillment" name="fulfillment"><option value="delivery">Delivery</option><option value="pickup">Pickup</option></select></label>
                     <label for="checkout-name">Full name<input id="checkout-name" name="name" autocomplete="name" required></label>
                     <label for="checkout-phone">Phone number<input id="checkout-phone" name="phone" type="tel" autocomplete="tel" required></label>
-                    <label for="checkout-address">Delivery address<textarea id="checkout-address" name="address" autocomplete="street-address" required></textarea></label>
+                    <label id="checkout-address-field" for="checkout-address">Delivery address<textarea id="checkout-address" name="address" autocomplete="street-address" required></textarea></label>
                     <label for="checkout-payment-method">Payment method<select id="checkout-payment-method" name="payment-method"><option>Union Bank</option><option>OPay</option></select></label>
                     <div class="payment-account" id="payment-account" aria-live="polite"></div>
                     <label for="checkout-receipt">Payment receipt<input id="checkout-receipt" name="receipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required><small>Pay by bank transfer, then upload your receipt (image or PDF, up to 5 MB).</small></label>
