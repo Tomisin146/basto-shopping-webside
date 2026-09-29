@@ -30,6 +30,7 @@
                 id: item.id,
                 name: item.name,
                 category: item.category,
+                subcategory: item.subcategory || '',
                 description: item.description,
                 sizes: item.sizes || [],
                 price: Number(item.price),

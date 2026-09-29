@@ -7,6 +7,8 @@ const productModal = document.querySelector('#product-modal');
 const modalTitle = document.querySelector('#product-modal-title');
 const modalPrice = document.querySelector('#product-modal-price');
 const modalImage = document.querySelector('#product-modal-image');
+const imageViewer = document.querySelector('#product-image-viewer');
+const imageViewerImage = document.querySelector('#product-image-viewer-image');
 const modalDescription = document.querySelector('.modal-description');
 const productSize = document.querySelector('#product-size');
 const productQuantity = document.querySelector('#product-quantity');
@@ -68,12 +70,43 @@ try {
 const emptyCatalogMessage = inventoryLoadFailed
 	? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
 	: '<p class="catalog-empty">No items available in this category yet.</p>';
-const maxHomeProducts = 10;
+const maxHomeProducts = 20;
+const storefrontSubcategories = {
+	tops: ['Trending', 'Big Tops', 'Stretch Top', 'Small Polo'],
+	pants: ['Baggy Jean', 'Stock Jean', 'Baggy Short Jean', 'Joggers Short', 'Joggers Long']
+};
+const availableProductCount = (products) => products.filter((product) => product.available !== false && Number(product.stock ?? 1) - Number(product.sold ?? 0) > 0).length;
+const renderSubcategoryNavigation = (categoryId, title, products) => {
+	const subcategories = storefrontSubcategories[categoryId];
+	if (!subcategories) return '';
+	return `<nav class="subcategory-navigation" aria-label="${title} subcategories"><button type="button" data-subcategory-filter="" aria-pressed="true">All</button>${subcategories.map((subcategory) => `<button type="button" data-subcategory-filter="${escapeHtml(subcategory)}" aria-pressed="false">${escapeHtml(subcategory)}</button>`).join('')}</nav>`;
+};
+const homeCategoryStates = new Map();
+let bindProductCards = () => {};
+const renderHomeCategory = (state, reset = false) => {
+	if (reset) {
+		state.renderedCount = 0;
+		state.visibleCount = maxHomeProducts;
+		state.grid.replaceChildren();
+	}
+	const products = state.products.filter((product) => !state.activeSubcategory || product.subcategory === state.activeSubcategory);
+	if (!products.length) {
+		state.grid.innerHTML = emptyCatalogMessage;
+		state.showMore.hidden = true;
+		return;
+	}
+	const batch = products.slice(state.renderedCount, state.visibleCount);
+	state.grid.insertAdjacentHTML('beforeend', batch.map(renderProductCard).join(''));
+	state.renderedCount += batch.length;
+	bindProductCards(state.grid);
+	state.showMore.hidden = state.renderedCount >= products.length;
+	state.showMore.textContent = `Show More (${products.length - state.renderedCount})`;
+};
 document.querySelector('.new-arrivals .product-grid')?.replaceChildren();
 
 const categoryCatalog = [
 	{
-		id: 'pants', title: 'Pants', products: [
+		id: 'pants', title: 'Trousers', products: [
 			['Wide-leg trouser', 'Soft cotton · Black', 118, 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=700&q=85'],
 			['Panelled denim jean', 'Washed denim · Indigo', 124, 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=700&q=85'],
 			['Pleated tailored pant', 'Wool blend · Charcoal', 132, 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=700&q=85'],
@@ -131,12 +164,14 @@ const categoryCatalog = [
 const renderProductCard = (product) => {
 	const remaining = Math.max(0, product.stock - product.sold);
 	const available = product.available && remaining > 0;
-	return `<article class="clothing-card" data-product-id="${escapeHtml(product.id || '')}" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-image="${escapeHtml(product.image || '')}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+	return `<article class="clothing-card" data-product-id="${escapeHtml(product.id || '')}" data-stock="${remaining}" data-description="${escapeHtml(product.description)}" data-sizes="${escapeHtml(product.sizes.join('|'))}" data-subcategory="${escapeHtml(product.subcategory || '')}" data-image="${escapeHtml(product.image || '')}" data-available="${available}"><div class="clothing-image"${product.image ? ` style="background-image: url('${product.image}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.details)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(product.price)}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button" data-product="${escapeHtml(product.name)}"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
 };
 
 const supportedSizesFor = (item) => {
-	const supportedSizes = ['pants', 'shoes'].includes(item.category)
-		? Array.from({ length: 11 }, (_, index) => String(36 + index))
+	const supportedSizes = item.category === 'pants'
+		? ['XL', '2XL', '3XL', '47', '48', '49', '50']
+		: item.category === 'shoes'
+			? Array.from({ length: 11 }, (_, index) => String(36 + index))
 		: ['cosmetics', 'watch-accessories'].includes(item.category) ? [] : ['L', 'XL', '2XL', '3XL'];
 	return (item.sizes || []).map(String).filter((size) => supportedSizes.includes(size));
 };
@@ -157,13 +192,24 @@ if (catalogSections) {
 				stock: Number(item.stock ?? 1),
 				sold: Number(item.sold ?? 0),
 				description: item.description,
+				subcategory: item.subcategory || '',
 				sizes: supportedSizesFor(item),
 			}));
 		const section = document.createElement('section');
 		section.className = 'clothing-section catalog-section';
 		section.id = category.id;
-		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${adminProducts.length} pieces</span></div><div class="clothing-grid">${adminProducts.length ? adminProducts.slice(0, maxHomeProducts).map(renderProductCard).join('') : emptyCatalogMessage}</div>${adminProducts.length > maxHomeProducts ? `<a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>` : ''}`;
+		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${availableProductCount(adminProducts)} available</span></div>${renderSubcategoryNavigation(category.id, category.title, adminProducts)}<div class="clothing-grid"></div><button class="catalog-show-more" type="button" hidden>Show More</button>${adminProducts.length > maxHomeProducts ? `<a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>` : ''}`;
 		catalogSections.appendChild(section);
+		const state = {
+			products: adminProducts,
+			grid: section.querySelector('.clothing-grid'),
+			showMore: section.querySelector('.catalog-show-more'),
+			activeSubcategory: '',
+			renderedCount: 0,
+			visibleCount: maxHomeProducts
+		};
+		homeCategoryStates.set(category.id, state);
+		renderHomeCategory(state, true);
 	});
 }
 
@@ -177,19 +223,25 @@ const adminTops = adminInventory.filter((item) => item.category === 'tops').map(
 	stock: Number(item.stock ?? 1),
 	sold: Number(item.sold ?? 0),
 	description: item.description,
+	subcategory: item.subcategory || '',
 	sizes: supportedSizesFor(item),
 }));
 
 const topsSection = document.querySelector('#tops');
 if (topsSection) {
-	topsSection.querySelector('.clothing-grid')?.replaceChildren();
-	if (adminTops.length) {
-		topsSection.querySelector('.clothing-grid')?.insertAdjacentHTML('beforeend', adminTops.slice(0, maxHomeProducts).map(renderProductCard).join(''));
-		topsSection.querySelector('.catalog-count').textContent = `${adminTops.length} pieces`;
-	} else {
-		topsSection.querySelector('.clothing-grid').innerHTML = emptyCatalogMessage;
-		topsSection.querySelector('.catalog-count').textContent = '0 pieces';
-	}
+	const grid = topsSection.querySelector('.clothing-grid');
+	grid.replaceChildren();
+	topsSection.querySelector('.catalog-count').textContent = `${availableProductCount(adminTops)} available`;
+	topsSection.querySelector('.section-heading').insertAdjacentHTML('afterend', renderSubcategoryNavigation('tops', 'Tops', adminTops));
+	const showMore = document.createElement('button');
+	showMore.type = 'button';
+	showMore.className = 'catalog-show-more';
+	showMore.hidden = true;
+	showMore.textContent = 'Show More';
+	grid.after(showMore);
+	const state = { products: adminTops, grid, showMore, activeSubcategory: '', renderedCount: 0, visibleCount: maxHomeProducts };
+	homeCategoryStates.set('tops', state);
+	renderHomeCategory(state, true);
 	const topsViewMore = topsSection.querySelector('.view-more-button');
 	if (topsViewMore) topsViewMore.hidden = adminTops.length <= maxHomeProducts;
 }
@@ -319,10 +371,11 @@ if (menuToggle && navigation) {
 	});
 }
 
-document.querySelectorAll('.add-to-cart').forEach((button) => {
-	button.addEventListener('click', () => {
-		const card = button.closest('.clothing-card');
-		if (!card) return;
+const wireProductCard = (card) => {
+	if (card.dataset.interactionsBound) return;
+	card.dataset.interactionsBound = 'true';
+	const button = card.querySelector('.add-to-cart');
+	button?.addEventListener('click', () => {
 		const sizes = card.hasAttribute('data-sizes') ? card.dataset.sizes.split('|').filter(Boolean) : ['L', 'XL', '2XL', '3XL'];
 		if (Number(card.dataset.stock || 1) > 1 || sizes.length) {
 			card.click();
@@ -332,12 +385,6 @@ document.querySelectorAll('.add-to-cart').forEach((button) => {
 		button.classList.add('added');
 		button.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
 	});
-});
-
-document.querySelectorAll('.clothing-card').forEach((card) => {
-	card.setAttribute('tabindex', '0');
-	card.setAttribute('aria-label', `View details for ${card.querySelector('h3').textContent}`);
-
 	const openProductDetails = () => {
 		if (!modalTitle || !modalPrice || !modalImage || !modalDescription || !productSize || !productQuantity || !modalAddButton || !productModal) return;
 		selectedProduct = card;
@@ -376,7 +423,7 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 	};
 
 	card.addEventListener('click', (event) => {
-		if (!event.target.closest('.add-to-cart')) openProductDetails();
+		if (!event.target.closest('.add-to-cart, .clothing-image')) openProductDetails();
 	});
 	card.addEventListener('keydown', (event) => {
 		if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('.add-to-cart')) {
@@ -384,6 +431,57 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
 			openProductDetails();
 		}
 	});
+};
+bindProductCards = (container = document) => {
+	if (container.matches?.('.clothing-card')) wireProductCard(container);
+	container.querySelectorAll('.clothing-card').forEach(wireProductCard);
+};
+bindProductCards();
+
+const closeImageViewer = () => {
+	imageViewer.hidden = true;
+	if ((!productModal || productModal.hidden) && (!cartDrawer || !cartDrawer.classList.contains('open'))) {
+		document.body.classList.remove('modal-open');
+	}
+};
+document.addEventListener('click', (event) => {
+	const imageTarget = event.target.closest('.clothing-image');
+	if (imageTarget) {
+		const card = imageTarget.closest('.clothing-card');
+		const imageSource = getCardData(card).image;
+		if (!imageSource) return;
+		imageViewerImage.src = imageSource;
+		imageViewerImage.alt = `${card.querySelector('h3')?.textContent || 'Product'} image`;
+		imageViewer.hidden = false;
+		document.body.classList.add('modal-open');
+		return;
+	}
+	if (event.target === imageViewer || event.target.closest('[data-close-image-viewer]')) closeImageViewer();
+});
+document.addEventListener('keydown', (event) => {
+	if (event.key === 'Escape' && !imageViewer.hidden) closeImageViewer();
+});
+
+document.addEventListener('click', (event) => {
+	const filterButton = event.target.closest('[data-subcategory-filter]');
+	if (filterButton) {
+		const section = filterButton.closest('.clothing-section');
+		const state = section && homeCategoryStates.get(section.id);
+		if (state) {
+			state.activeSubcategory = filterButton.dataset.subcategoryFilter || '';
+			section.querySelectorAll('[data-subcategory-filter]').forEach((button) => {
+				button.setAttribute('aria-pressed', String(button === filterButton));
+			});
+			renderHomeCategory(state, true);
+		}
+	}
+	const showMoreButton = event.target.closest('.catalog-show-more');
+	if (!showMoreButton) return;
+	const section = showMoreButton.closest('.clothing-section');
+	const state = section && homeCategoryStates.get(section.id);
+	if (!state) return;
+	state.visibleCount += maxHomeProducts;
+	renderHomeCategory(state);
 });
 
 document.querySelectorAll('[data-close-product]').forEach((control) => {
@@ -558,20 +656,47 @@ window.addEventListener('pageshow', () => {
 });
 
 if (searchInput) {
-	const searchableSections = document.querySelectorAll('.clothing-section');
+	const storefrontMain = document.querySelector('#home');
+	const searchResultsSection = document.createElement('section');
+	searchResultsSection.className = 'clothing-section search-results-section';
+	searchResultsSection.hidden = true;
+	searchResultsSection.innerHTML = '<div class="section-heading"><div><p class="eyebrow">Search</p><h2>Results</h2></div><span class="catalog-count"></span></div><div class="clothing-grid search-results-grid"></div>';
+	storefrontMain.querySelector('.hero').after(searchResultsSection);
+	const searchResultsGrid = searchResultsSection.querySelector('.search-results-grid');
+	const normalMainVisibility = new Map([...storefrontMain.children].filter((child) => child !== searchResultsSection).map((child) => [child, child.hidden]));
+	const searchableProducts = adminInventory.map((item) => ({
+		id: item.id,
+		name: item.name,
+		category: item.category,
+		details: item.description,
+		price: Number(item.price),
+		image: safeImageUrl(item.image),
+		available: item.available !== false,
+		stock: Number(item.stock ?? 1),
+		sold: Number(item.sold ?? 0),
+		description: item.description,
+		subcategory: item.subcategory || '',
+		sizes: supportedSizesFor(item),
+		searchText: `${item.name} ${item.description || ''} ${item.category} ${item.category === 'pants' ? 'Trousers' : ''} ${item.subcategory || ''} ${(item.sizes || []).join(' ')}`.toLowerCase()
+	}));
 	searchInput.addEventListener('input', () => {
 		const query = searchInput.value.trim().toLowerCase();
-		searchableSections.forEach((section) => {
-			const cards = section.querySelectorAll('.clothing-card');
-			let visibleCards = 0;
-			cards.forEach((card) => {
-				const heading = section.querySelector('h2, h1')?.textContent?.toLowerCase() || '';
-				const matches = !query || card.textContent.toLowerCase().includes(query) || heading.includes(query);
-				card.hidden = !matches;
-				if (matches) visibleCards += 1;
-			});
-			section.hidden = visibleCards === 0;
-		});
+		if (!query) {
+			searchResultsSection.hidden = true;
+			normalMainVisibility.forEach((wasHidden, element) => { element.hidden = wasHidden; });
+			return;
+		}
+		normalMainVisibility.forEach((wasHidden, element) => { element.hidden = true; });
+		searchResultsSection.hidden = false;
+		const matches = searchableProducts.filter((product) => product.searchText.includes(query));
+		searchResultsSection.querySelector('h2').textContent = `Results for “${searchInput.value.trim()}”`;
+		searchResultsGrid.replaceChildren();
+		if (!matches.length) {
+			searchResultsGrid.innerHTML = '<p class="catalog-empty" role="status">No products found.</p>';
+			return;
+		}
+		searchResultsGrid.insertAdjacentHTML('beforeend', matches.map(renderProductCard).join(''));
+		bindProductCards(searchResultsGrid);
 	});
 }
 

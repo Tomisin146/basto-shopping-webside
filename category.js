@@ -11,9 +11,18 @@ const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG'
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const safeImageUrl = (value) => String(value || '').replace(/["'()\\]/g, '');
 const inventoryStorageKey = 'bastoInventory';
+const categorySubcategories = {
+    tops: ['Trending', 'Big Tops', 'Stretch Top', 'Small Polo'],
+    pants: ['Baggy Jean', 'Stock Jean', 'Baggy Short Jean', 'Joggers Short', 'Joggers Long']
+};
+const pageSize = 20;
+const availableProductCount = (items) => items.filter((item) => item.available !== false && Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0)) > 0).length;
+let bindProductCards = () => {};
 const supportedSizesFor = (item) => {
-    const supportedSizes = ['pants', 'shoes'].includes(item.category)
-        ? Array.from({ length: 11 }, (_, index) => String(36 + index))
+    const supportedSizes = item.category === 'pants'
+        ? ['XL', '2XL', '3XL', '47', '48', '49', '50']
+        : item.category === 'shoes'
+            ? Array.from({ length: 11 }, (_, index) => String(36 + index))
         : ['cosmetics', 'watch-accessories'].includes(item.category) ? [] : ['L', 'XL', '2XL', '3XL'];
     return (item.sizes || []).map(String).filter((size) => supportedSizes.includes(size));
 };
@@ -42,20 +51,61 @@ if (categoryGrid) categoryGrid.innerHTML = '';
 const categoryItems = categoryId === 'new-arrivals'
     ? adminInventory
     : adminInventory.filter((item) => item.category === categoryId);
-if (categoryGrid && categoryItems.length) {
-    categoryGrid.insertAdjacentHTML('beforeend', categoryItems.map((item) => {
+if (categoryId === 'pants' && categorySection) {
+    categorySection.querySelector('h1').textContent = 'Trousers';
+    document.title = document.title.replace('Pants', 'Trousers');
+}
+if (categorySection) {
+    const countElement = categorySection.querySelector('.catalog-count');
+    if (countElement) countElement.textContent = `${availableProductCount(categoryItems)} available`;
+}
+const activeCategorySubcategories = categorySubcategories[categoryId] || [];
+let activeSubcategory = '';
+let renderedProductCount = 0;
+let visibleProductCount = pageSize;
+let categoryFilters;
+if (categorySection && activeCategorySubcategories.length) {
+    categoryFilters = document.createElement('nav');
+    categoryFilters.className = 'subcategory-navigation';
+    categoryFilters.setAttribute('aria-label', `${categoryId === 'pants' ? 'Trousers' : 'Tops'} subcategories`);
+    categoryFilters.innerHTML = `<button type="button" data-subcategory-filter="" aria-pressed="true">All</button>${activeCategorySubcategories.map((subcategory) => `<button type="button" data-subcategory-filter="${escapeHtml(subcategory)}" aria-pressed="false">${escapeHtml(subcategory)}</button>`).join('')}`;
+    categorySection.querySelector('.section-heading').after(categoryFilters);
+}
+const showMoreButton = document.createElement('button');
+showMoreButton.className = 'catalog-show-more';
+showMoreButton.type = 'button';
+showMoreButton.hidden = true;
+showMoreButton.textContent = 'Show More';
+if (categoryGrid) categoryGrid.after(showMoreButton);
+const renderCategoryProducts = (reset = false) => {
+    if (!categoryGrid) return;
+    if (reset) {
+        renderedProductCount = 0;
+        visibleProductCount = pageSize;
+        categoryGrid.replaceChildren();
+    }
+    const products = categoryItems.filter((item) => !activeSubcategory || item.subcategory === activeSubcategory);
+    if (!products.length) {
+        categoryGrid.innerHTML = inventoryLoadFailed
+            ? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
+            : '<p class="catalog-empty">No items available in this category yet.</p>';
+        showMoreButton.hidden = true;
+        return;
+    }
+    const batch = products.slice(renderedProductCount, visibleProductCount);
+    categoryGrid.insertAdjacentHTML('beforeend', batch.map((item) => {
         const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
         const available = item.available !== false && remaining > 0;
         const imageSource = safeImageUrl(item.image);
         const sizes = supportedSizesFor(item);
-        return `<article class="clothing-card" data-product-id="${escapeHtml(item.id)}" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml(sizes.join('|'))}" data-image="${escapeHtml(imageSource)}" data-available="${available}"><div class="clothing-image"${imageSource ? ` style="background-image: url('${imageSource}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+        return `<article class="clothing-card" data-product-id="${escapeHtml(item.id)}" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml(sizes.join('|'))}" data-subcategory="${escapeHtml(item.subcategory || '')}" data-image="${escapeHtml(imageSource)}" data-available="${available}"><div class="clothing-image"${imageSource ? ` style="background-image: url('${imageSource}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
     }).join(''));
-    if (categorySection) categorySection.querySelector('.catalog-count').textContent = `${categoryGrid.querySelectorAll('.clothing-card').length} pieces`;
-}
-if (categorySection && !categoryItems.length) categorySection.querySelector('.catalog-count').textContent = '0 pieces';
-if (categoryGrid && !categoryItems.length) categoryGrid.innerHTML = inventoryLoadFailed
-    ? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
-    : '<p class="catalog-empty">No items available in this category yet.</p>';
+    renderedProductCount += batch.length;
+    bindProductCards(categoryGrid);
+    showMoreButton.hidden = renderedProductCount >= products.length;
+    showMoreButton.textContent = `Show More (${products.length - renderedProductCount})`;
+};
+renderCategoryProducts(true);
 
 const headerActions = document.querySelector('.header-actions');
 if (headerActions && !headerActions.querySelector('.cart-button')) {
@@ -80,6 +130,10 @@ if (!document.getElementById('product-modal')) {
         <button class="modal-add" type="button" id="modal-add-to-cart">Add to cart <span aria-hidden="true">+</span></button>
     </section>
 </div>
+<div class="product-image-viewer" id="product-image-viewer" hidden>
+    <button class="image-viewer-close" type="button" aria-label="Close product image" data-close-image-viewer>×</button>
+    <img id="product-image-viewer-image" alt="">
+</div>
 <aside class="cart-drawer" id="cart-drawer" aria-label="Shopping cart" aria-hidden="true">
     <div class="cart-drawer-header"><div><p class="eyebrow">Your selection</p><h2>Your cart</h2></div><button class="modal-close" type="button" aria-label="Close shopping cart" data-close-cart>×</button></div>
     <div class="cart-items" id="cart-items"><p class="cart-empty">Your cart is empty.</p></div>
@@ -92,6 +146,8 @@ const cartButton = document.querySelector('.cart-button');
 const cartCount = document.querySelector('.cart-count');
 const productModal = document.querySelector('#product-modal');
 const modalImage = document.querySelector('#product-modal-image');
+const imageViewer = document.querySelector('#product-image-viewer');
+const imageViewerImage = document.querySelector('#product-image-viewer-image');
 const cartDrawer = document.querySelector('#cart-drawer');
 const cartItemsElement = document.querySelector('#cart-items');
 const cartSubtotal = document.querySelector('#cart-subtotal');
@@ -212,10 +268,12 @@ const openProductDetails = (card) => {
     document.body.classList.add('modal-open');
 };
 
-document.querySelectorAll('.clothing-card').forEach((card) => {
+const wireCategoryCard = (card) => {
+    if (card.dataset.interactionsBound) return;
+    card.dataset.interactionsBound = 'true';
     card.setAttribute('tabindex', '0');
     card.addEventListener('click', (event) => {
-        if (event.target.closest('.add-to-cart')) return;
+        if (event.target.closest('.add-to-cart, .clothing-image')) return;
         openProductDetails(card);
     });
     card.addEventListener('keydown', (event) => {
@@ -224,14 +282,10 @@ document.querySelectorAll('.clothing-card').forEach((card) => {
             openProductDetails(card);
         }
     });
-});
-
-document.querySelectorAll('.add-to-cart').forEach((button) => {
-    button.addEventListener('click', (event) => {
+    const button = card.querySelector('.add-to-cart');
+    button?.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const card = button.closest('.clothing-card');
-        if (!card) return;
         const sizes = (card.dataset.sizes || '').split('|').filter(Boolean);
         if (Number(card.dataset.stock || 1) > 1 || sizes.length) {
             card.click();
@@ -241,6 +295,49 @@ document.querySelectorAll('.add-to-cart').forEach((button) => {
         button.classList.add('added');
         button.innerHTML = 'Added to cart <span aria-hidden="true">✓</span>';
     });
+};
+bindProductCards = (container = document) => {
+    if (container.matches?.('.clothing-card')) wireCategoryCard(container);
+    container.querySelectorAll('.clothing-card').forEach(wireCategoryCard);
+};
+bindProductCards();
+
+const closeImageViewer = () => {
+    imageViewer.hidden = true;
+    if ((!productModal || productModal.hidden) && (!cartDrawer || !cartDrawer.classList.contains('open'))) {
+        document.body.classList.remove('modal-open');
+    }
+};
+document.addEventListener('click', (event) => {
+    const imageTarget = event.target.closest('.clothing-image');
+    if (imageTarget) {
+        const card = imageTarget.closest('.clothing-card');
+        const imageSource = card?.dataset.image || '';
+        if (!imageSource) return;
+        imageViewerImage.src = imageSource;
+        imageViewerImage.alt = `${card.querySelector('h3')?.textContent || 'Product'} image`;
+        imageViewer.hidden = false;
+        document.body.classList.add('modal-open');
+        return;
+    }
+    if (event.target === imageViewer || event.target.closest('[data-close-image-viewer]')) closeImageViewer();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !imageViewer.hidden) closeImageViewer();
+});
+
+categoryFilters?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-subcategory-filter]');
+    if (!button) return;
+    activeSubcategory = button.dataset.subcategoryFilter || '';
+    categoryFilters.querySelectorAll('[data-subcategory-filter]').forEach((filterButton) => {
+        filterButton.setAttribute('aria-pressed', String(filterButton === button));
+    });
+    renderCategoryProducts(true);
+});
+showMoreButton.addEventListener('click', () => {
+    visibleProductCount += pageSize;
+    renderCategoryProducts();
 });
 
 document.querySelectorAll('[data-close-product]').forEach((control) => control.addEventListener('click', () => {

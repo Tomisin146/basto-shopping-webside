@@ -3,7 +3,7 @@ const inventoryStorageKey = 'bastoInventory';
 const categoryPreferenceKey = 'bastoLastProductCategory';
 const categories = {
     tops: 'Tops',
-    pants: 'Pants',
+    pants: 'Trousers',
     shoes: 'Shoes',
     'watch-accessories': 'Watch & accessories',
     cap: 'Cap',
@@ -13,13 +13,20 @@ const categories = {
 const maxVisibleInventoryItems = 10;
 const expandedInventoryCategories = new Set();
 const categoriesWithoutSizes = new Set(['cosmetics', 'watch-accessories']);
+const subcategoriesByCategory = {
+    tops: ['Trending', 'Big Tops', 'Stretch Top', 'Small Polo'],
+    pants: ['Baggy Jean', 'Stock Jean', 'Baggy Short Jean', 'Joggers Short', 'Joggers Long']
+};
 const clothingSizes = ['L', 'XL', '2XL', '3XL'];
 const numberSizes = Array.from({ length: 11 }, (_, index) => String(36 + index));
+const trousersSizes = ['XL', '2XL', '3XL', '47', '48', '49', '50'];
 
 const form = document.querySelector('#product-form');
 const productId = document.querySelector('#product-id');
 const productName = document.querySelector('#product-name');
 const productCategory = document.querySelector('#product-category');
+const productSubcategory = document.querySelector('#product-subcategory');
+const subcategoryField = document.querySelector('#subcategory-field');
 const sizeOptions = document.querySelector('#size-options');
 const sizeField = document.querySelector('#size-field');
 const productDescription = document.querySelector('#product-description');
@@ -231,6 +238,13 @@ ordersList.addEventListener('change', async (event) => {
     }
 });
 const selectedSizes = () => [...document.querySelectorAll('input[name="size"]:checked')].map((input) => input.value);
+const renderSubcategoryOptions = (selected = '') => {
+    const options = subcategoriesByCategory[productCategory.value] || [];
+    subcategoryField.hidden = !options.length;
+    productSubcategory.innerHTML = '<option value="">No subcategory</option>'
+        + options.map((subcategory) => `<option value="${subcategory}">${subcategory}</option>`).join('');
+    productSubcategory.value = options.includes(selected) ? selected : '';
+};
 const renderSizeOptions = (selected = []) => {
     const hasSizes = !categoriesWithoutSizes.has(productCategory.value);
     sizeField.hidden = !hasSizes;
@@ -238,7 +252,7 @@ const renderSizeOptions = (selected = []) => {
         sizeOptions.replaceChildren();
         return;
     }
-    const sizes = ['pants', 'shoes'].includes(productCategory.value) ? numberSizes : clothingSizes;
+    const sizes = productCategory.value === 'pants' ? trousersSizes : productCategory.value === 'shoes' ? numberSizes : clothingSizes;
     const selectedValues = selected.map(String).filter((size) => sizes.includes(size));
     sizeOptions.innerHTML = sizes.map((size) => `<label><input type="checkbox" name="size" value="${size}"${selectedValues.includes(size) ? ' checked' : ''}> ${size}</label>`).join('');
 };
@@ -303,7 +317,7 @@ const renderInventory = () => {
         <div class="admin-item-image">${imageSource ? `<img src="${escapeHtml(imageSource)}" alt="${escapeHtml(item.name)}" loading="lazy">` : '<span>No image</span>'}</div>
         <div class="admin-item-details">
             <h3>${escapeHtml(item.name)}</h3>
-            <p>${escapeHtml(categories[item.category] || item.category)} · ${(item.sizes || []).length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
+            <p>${escapeHtml(categories[item.category] || item.category)}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ''} · ${(item.sizes || []).length ? escapeHtml(item.sizes.join(', ')) : 'One size'} · ${item.stock ?? 1} pcs total · ${item.sold ?? 0} sold · ${remaining} pcs left</p>
         </div>
         <div class="admin-item-meta"><strong>${formatPrice(item.price)}</strong><span class="${item.available && remaining ? '' : 'sold-out-label'}">${item.available && remaining ? `${remaining} pcs left` : 'Sold out'}</span></div>
         <div class="admin-item-actions">
@@ -331,6 +345,7 @@ const startEdit = (item) => {
     productCategory.value = item.category;
     localStorage.setItem(categoryPreferenceKey, item.category);
     renderSizeOptions(item.sizes || []);
+    renderSubcategoryOptions(item.subcategory || '');
     productDescription.value = item.description;
     productPrice.value = item.price;
     productStock.value = item.stock ?? 1;
@@ -352,8 +367,10 @@ if (categories[preferredCategory]) productCategory.value = preferredCategory;
 productCategory.addEventListener('change', () => {
     localStorage.setItem(categoryPreferenceKey, productCategory.value);
     renderSizeOptions();
+    renderSubcategoryOptions();
 });
 renderSizeOptions();
+renderSubcategoryOptions();
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -364,12 +381,13 @@ form.addEventListener('submit', async (event) => {
             id: productId.value || makeId(),
             name: productName.value.trim(),
             category: productCategory.value,
+            subcategory: productSubcategory.value,
             description: productDescription.value.trim(),
             sizes: selectedSizes(),
             price: Number(productPrice.value),
             stock: Number(productStock.value),
             sold: Number(productSold.value),
-            image: productImage.value.trim(),
+            image: productImage.value.trim() || inventory.find((entry) => entry.id === productId.value)?.image || '',
             available: productAvailable.checked
         };
         if (uploadedImage) item.image = await inventoryApi.uploadProductImage(uploadedImage, item.id);

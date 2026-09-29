@@ -49,13 +49,16 @@
                     <label for="product-name">Item name<input id="product-name" required type="text" placeholder="e.g. Linen resort shirt"></label>
                     <label for="product-category">Category<select id="product-category" required>
                         <option value="tops">Tops</option>
-                        <option value="pants">Pants</option>
+                        <option value="pants">Trousers</option>
                         <option value="shoes">Shoes</option>
                         <option value="watch-accessories">Watch &amp; accessories</option>
                         <option value="cap">Cap</option>
                         <option value="cosmetics">Cosmetics</option>
                         <option value="undies">Undies</option>
                     </select></label>
+                    <label id="subcategory-field" for="product-subcategory" hidden>Subcategory
+                        <select id="product-subcategory"><option value="">No subcategory</option></select>
+                    </label>
                     <label for="product-description">Description<textarea id="product-description" required placeholder="Short product description"></textarea></label>
                     <label id="size-field">Sizes available
                         <span class="admin-checks" id="size-options"></span>

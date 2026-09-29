@@ -11,6 +11,7 @@ create table public.products (
   id text primary key,
   name text not null,
   category text not null,
+  subcategory text not null default '',
   description text not null default '',
   sizes text[] not null default '{}',
   colors text not null default '',
@@ -21,6 +22,10 @@ create table public.products (
   available boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+-- For an existing products table, add the optional subcategory column once:
+alter table public.products
+add column if not exists subcategory text not null default '';
 
 alter table public.products enable row level security;
 
