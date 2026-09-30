@@ -20,12 +20,17 @@ create table public.products (
   sold integer not null default 0,
   image text not null default '',
   available boolean not null default true,
+  is_new_arrival boolean not null default false,
   created_at timestamptz not null default now()
 );
 
 -- For an existing products table, add the optional subcategory column once:
 alter table public.products
 add column if not exists subcategory text not null default '';
+
+-- For an existing products table, add the optional New Arrival flag once:
+alter table public.products
+add column if not exists is_new_arrival boolean not null default false;
 
 alter table public.products enable row level security;
 

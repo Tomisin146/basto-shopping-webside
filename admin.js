@@ -36,6 +36,7 @@ const productSold = document.querySelector('#product-sold');
 const productImage = document.querySelector('#product-image');
 const productImageFile = document.querySelector('#product-image-file');
 const productAvailable = document.querySelector('#product-available');
+const productNewArrival = document.querySelector('#product-new-arrival');
 const saveButton = document.querySelector('#save-product');
 const cancelEditButton = document.querySelector('#cancel-edit');
 const formTitle = document.querySelector('#product-form-title');
@@ -285,9 +286,11 @@ const readImageFile = (file) => new Promise((resolve, reject) => {
 
 const resetForm = () => {
     const selectedCategory = productCategory.value;
+    const selectedSubcategory = productSubcategory.value;
     form.reset();
     productCategory.value = selectedCategory;
     localStorage.setItem(categoryPreferenceKey, selectedCategory);
+    renderSubcategoryOptions(selectedSubcategory);
     renderSizeOptions();
     productId.value = '';
     productImageFile.required = true;
@@ -353,6 +356,7 @@ const startEdit = (item) => {
     productImage.value = item.image || '';
     productImageFile.required = false;
     productAvailable.checked = item.available;
+    productNewArrival.checked = item.is_new_arrival === true;
     document.querySelectorAll('input[name="size"]').forEach((input) => {
         input.checked = (item.sizes || []).map(String).includes(input.value);
     });
@@ -388,7 +392,8 @@ form.addEventListener('submit', async (event) => {
             stock: Number(productStock.value),
             sold: Number(productSold.value),
             image: productImage.value.trim() || inventory.find((entry) => entry.id === productId.value)?.image || '',
-            available: productAvailable.checked
+            available: productAvailable.checked,
+            is_new_arrival: productNewArrival.checked
         };
         if (uploadedImage) item.image = await inventoryApi.uploadProductImage(uploadedImage, item.id);
         const existingIndex = inventory.findIndex((entry) => entry.id === item.id);

@@ -87,9 +87,11 @@ a { color: inherit; text-decoration: none; } button { font: inherit; cursor: poi
 .catalog-show-more:hover { background: var(--ink); color: white; }
 .catalog-show-more[hidden] { display: none; }
 .clothing-grid { display: grid; gap: 32px 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.catalog-group-heading { color: var(--ink); font-size: 13px; font-weight: 600; grid-column: 1 / -1; margin: 8px 0 -14px; }
 .catalog-empty { color: var(--muted); font-size: 13px; grid-column: 1 / -1; margin: 12px 0 0; padding: 28px 0; }
 .clothing-card { min-width: 0; }
 .clothing-image { background-position: center; background-size: cover; height: 330px; position: relative; }
+.search-results-grid .clothing-image { cursor: default; }
 .clothing-image-one { background-image: url("https://images.unsplash.com/photo-1603252110481-7ba873bf42ab?auto=format&fit=crop&w=700&q=85"); }
 .clothing-image-two { background-image: url("https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=700&q=85"); }
 .clothing-image-three { background-image: url("https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=700&q=85"); }

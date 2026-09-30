@@ -16,6 +16,14 @@ const categorySubcategories = {
     pants: ['Baggy Jean', 'Stock Jean', 'Baggy Short Jean', 'Joggers Short', 'Joggers Long']
 };
 const pageSize = 20;
+const shuffleProducts = (products) => {
+    const shuffled = [...products];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
+};
 const availableProductCount = (items) => items.filter((item) => item.available !== false && Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0)) > 0).length;
 let bindProductCards = () => {};
 const supportedSizesFor = (item) => {
@@ -48,9 +56,10 @@ const categoryId = window.location.pathname.split('/').pop().replace('.html', ''
 const categorySection = document.querySelector('.category-page');
 const categoryGrid = categorySection?.querySelector('.clothing-grid');
 if (categoryGrid) categoryGrid.innerHTML = '';
-const categoryItems = categoryId === 'new-arrivals'
-    ? adminInventory
+const categoryProducts = categoryId === 'new-arrivals'
+    ? adminInventory.filter((item) => item.is_new_arrival === true)
     : adminInventory.filter((item) => item.category === categoryId);
+const categoryItems = categoryId === 'pants' ? shuffleProducts(categoryProducts) : categoryProducts;
 if (categoryId === 'pants' && categorySection) {
     categorySection.querySelector('h1').textContent = 'Trousers';
     document.title = document.title.replace('Pants', 'Trousers');
@@ -84,7 +93,13 @@ const renderCategoryProducts = (reset = false) => {
         visibleProductCount = pageSize;
         categoryGrid.replaceChildren();
     }
-    const products = categoryItems.filter((item) => !activeSubcategory || item.subcategory === activeSubcategory);
+    const products = categoryItems
+        .filter((item) => !activeSubcategory || item.subcategory === activeSubcategory)
+        .sort((first, second) => {
+            if (categoryId !== 'tops') return 0;
+            const groupOrder = (item) => item.subcategory === 'Trending' ? 0 : item.subcategory === 'Big Tops' ? 2 : 1;
+            return groupOrder(first) - groupOrder(second);
+        });
     if (!products.length) {
         categoryGrid.innerHTML = inventoryLoadFailed
             ? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
@@ -93,12 +108,18 @@ const renderCategoryProducts = (reset = false) => {
         return;
     }
     const batch = products.slice(renderedProductCount, visibleProductCount);
-    categoryGrid.insertAdjacentHTML('beforeend', batch.map((item) => {
+    categoryGrid.insertAdjacentHTML('beforeend', batch.map((item, index) => {
         const remaining = Math.max(0, Number(item.stock ?? 1) - Number(item.sold ?? 0));
         const available = item.available !== false && remaining > 0;
         const imageSource = safeImageUrl(item.image);
         const sizes = supportedSizesFor(item);
-        return `<article class="clothing-card" data-product-id="${escapeHtml(item.id)}" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml(sizes.join('|'))}" data-subcategory="${escapeHtml(item.subcategory || '')}" data-image="${escapeHtml(imageSource)}" data-available="${available}"><div class="clothing-image"${imageSource ? ` style="background-image: url('${imageSource}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
+        const groupOrder = (product) => product.subcategory === 'Trending' ? 0 : product.subcategory === 'Big Tops' ? 2 : 1;
+        const currentGroup = groupOrder(item);
+        const previousItem = products[renderedProductCount + index - 1];
+        const showGroupHeading = categoryId === 'tops'
+            && (!previousItem || groupOrder(previousItem) !== currentGroup);
+        const heading = currentGroup === 0 ? 'TRENDING' : currentGroup === 2 ? 'BIG TOPS' : 'OTHER TOP ITEMS';
+        return `${showGroupHeading ? `<h2 class="catalog-group-heading">${heading}</h2>` : ''}<article class="clothing-card" data-product-id="${escapeHtml(item.id)}" data-stock="${remaining}" data-description="${escapeHtml(item.description)}" data-sizes="${escapeHtml(sizes.join('|'))}" data-subcategory="${escapeHtml(item.subcategory || '')}" data-image="${escapeHtml(imageSource)}" data-available="${available}"><div class="clothing-image"${imageSource ? ` style="background-image: url('${imageSource}')"` : ''}>${available ? '' : '<span class="clothing-label sold-out-label">Sold out</span>'}</div><div class="clothing-details"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p><small class="stock-status">${available ? (remaining <= 2 ? `${remaining} pcs left` : `${remaining} pcs available`) : 'Sold out'}</small></div><strong>${formatNaira(Number(item.price))}</strong></div><button class="add-to-cart${available ? '' : ' sold-out-button'}" type="button"${available ? '' : ' disabled'}>${available ? 'Add to cart <span aria-hidden="true">+</span>' : 'Sold out'}</button></article>`;
     }).join(''));
     renderedProductCount += batch.length;
     bindProductCards(categoryGrid);

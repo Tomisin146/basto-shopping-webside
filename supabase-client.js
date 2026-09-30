@@ -37,7 +37,8 @@
                 stock: Number(item.stock),
                 sold: Number(item.sold),
                 image: item.image || '',
-                available: item.available !== false
+                available: item.available !== false,
+                is_new_arrival: item.is_new_arrival === true
             };
             const { error } = await requireClient().from('products').upsert(record);
             if (error) throw error;

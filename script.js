@@ -76,6 +76,14 @@ const emptyCatalogMessage = inventoryLoadFailed
 	? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
 	: '<p class="catalog-empty">No items available in this category yet.</p>';
 const maxHomeProducts = 20;
+const shuffleProducts = (products) => {
+	const shuffled = [...products];
+	for (let index = shuffled.length - 1; index > 0; index -= 1) {
+		const swapIndex = Math.floor(Math.random() * (index + 1));
+		[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+	}
+	return shuffled;
+};
 const storefrontSubcategories = {
 	tops: ['Trending', 'Big Tops', 'Stretch Top', 'Small Polo'],
 	pants: ['Baggy Jean', 'Stock Jean', 'Baggy Short Jean', 'Joggers Short', 'Joggers Long']
@@ -94,14 +102,28 @@ const renderHomeCategory = (state, reset = false) => {
 		state.visibleCount = maxHomeProducts;
 		state.grid.replaceChildren();
 	}
-	const products = state.products.filter((product) => !state.activeSubcategory || product.subcategory === state.activeSubcategory);
+	const products = state.products
+		.filter((product) => !state.activeSubcategory || product.subcategory === state.activeSubcategory)
+		.sort((first, second) => {
+			if (state.categoryId !== 'tops') return 0;
+			const groupOrder = (product) => product.subcategory === 'Trending' ? 0 : product.subcategory === 'Big Tops' ? 2 : 1;
+			return groupOrder(first) - groupOrder(second);
+		});
 	if (!products.length) {
 		state.grid.innerHTML = emptyCatalogMessage;
 		state.showMore.hidden = true;
 		return;
 	}
 	const batch = products.slice(state.renderedCount, state.visibleCount);
-	state.grid.insertAdjacentHTML('beforeend', batch.map(renderProductCard).join(''));
+	state.grid.insertAdjacentHTML('beforeend', batch.map((product, index) => {
+		const groupOrder = (item) => item.subcategory === 'Trending' ? 0 : item.subcategory === 'Big Tops' ? 2 : 1;
+		const currentGroup = groupOrder(product);
+		const previousProduct = products[state.renderedCount + index - 1];
+		const showGroupHeading = state.categoryId === 'tops'
+			&& (!previousProduct || groupOrder(previousProduct) !== currentGroup);
+		const heading = currentGroup === 0 ? 'TRENDING' : currentGroup === 2 ? 'BIG TOPS' : 'OTHER TOP ITEMS';
+		return `${showGroupHeading ? `<h3 class="catalog-group-heading">${heading}</h3>` : ''}${renderProductCard(product)}`;
+	}).join(''));
 	state.renderedCount += batch.length;
 	bindProductCards(state.grid);
 	state.showMore.hidden = state.renderedCount >= products.length;
@@ -183,7 +205,7 @@ const supportedSizesFor = (item) => {
 
 const homeNewArrivalsSection = document.querySelector('#home-new-arrivals');
 if (homeNewArrivalsSection) {
-	const newestProducts = adminInventory.slice(0, 6).map((item) => ({
+	const newestProducts = adminInventory.filter((item) => item.is_new_arrival === true).slice(0, 6).map((item) => ({
 		id: item.id,
 		name: item.name,
 		category: item.category,
@@ -208,7 +230,7 @@ const catalogSections = document.querySelector('#catalog-sections');
 if (catalogSections) {
 	catalogSections.replaceChildren();
 	categoryCatalog.forEach((category) => {
-		const adminProducts = adminInventory
+		let adminProducts = adminInventory
 			.filter((item) => item.category === category.id)
 			.map((item) => ({
 				id: item.id,
@@ -223,12 +245,14 @@ if (catalogSections) {
 				subcategory: item.subcategory || '',
 				sizes: supportedSizesFor(item),
 			}));
+		if (category.id === 'pants') adminProducts = shuffleProducts(adminProducts);
 		const section = document.createElement('section');
 		section.className = 'clothing-section catalog-section';
 		section.id = category.id;
 		section.innerHTML = `<div class="section-heading"><div><h2>${category.title}</h2></div><span class="catalog-count">${availableProductCount(adminProducts)} available</span></div>${renderSubcategoryNavigation(category.id, category.title, adminProducts)}<div class="clothing-grid"></div><button class="catalog-show-more" type="button" hidden>Show More</button>${adminProducts.length > maxHomeProducts ? `<a class="view-more-button" href="${category.id}.html">View more <span aria-hidden="true">→</span></a>` : ''}`;
 		catalogSections.appendChild(section);
 		const state = {
+			categoryId: category.id,
 			products: adminProducts,
 			grid: section.querySelector('.clothing-grid'),
 			showMore: section.querySelector('.catalog-show-more'),
@@ -267,7 +291,7 @@ if (topsSection) {
 	showMore.hidden = true;
 	showMore.textContent = 'Show More';
 	grid.after(showMore);
-	const state = { products: adminTops, grid, showMore, activeSubcategory: '', renderedCount: 0, visibleCount: maxHomeProducts };
+	const state = { categoryId: 'tops', products: adminTops, grid, showMore, activeSubcategory: '', renderedCount: 0, visibleCount: maxHomeProducts };
 	homeCategoryStates.set('tops', state);
 	renderHomeCategory(state, true);
 	const topsViewMore = topsSection.querySelector('.view-more-button');
@@ -514,6 +538,7 @@ document.addEventListener('click', (event) => {
 	}
 	const imageTarget = event.target.closest('.clothing-image, .cart-item-image');
 	if (imageTarget) {
+		if (imageTarget.closest('.search-results-grid')) return;
 		const card = imageTarget.closest('.clothing-card');
 		const cartItem = imageTarget.closest('.cart-item');
 		const imageSource = card
