@@ -52,3 +52,8 @@ body { animation: basto-fade .25s ease-out; }
 	html { scroll-behavior: auto; }
 	*, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .01ms !important; transition-delay: 0s !important; }
 }
+
+/* iOS Safari zooms into inputs below 16px. */
+@media (max-width: 767px) {
+	input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), select, textarea { font-size: 16px !important; }
+}
