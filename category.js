@@ -39,14 +39,8 @@ let inventoryLoadFailed = false;
 try {
     adminInventory = window.bastoInventoryApi?.configured
         ? await window.bastoInventoryApi.listProducts()
-        : (() => {
-        try {
-            const savedInventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
-            return Array.isArray(savedInventory) ? savedInventory : [];
-        } catch (error) {
-            return [];
-        }
-    })();
+        : [];
+    if (!window.bastoInventoryApi?.configured) inventoryLoadFailed = true;
 } catch (error) {
     console.error('Could not load shared inventory.', error);
     inventoryLoadFailed = true;
@@ -59,7 +53,7 @@ if (categoryGrid) categoryGrid.innerHTML = '';
 const categoryProducts = categoryId === 'new-arrivals'
     ? adminInventory.filter((item) => item.is_new_arrival === true)
     : adminInventory.filter((item) => item.category === categoryId);
-const categoryItems = categoryId === 'pants' ? shuffleProducts(categoryProducts) : categoryProducts;
+const categoryItems = categoryProducts;
 if (categoryId === 'pants' && categorySection) {
     categorySection.querySelector('h1').textContent = 'Trousers';
     document.title = document.title.replace('Pants', 'Trousers');
@@ -295,9 +289,10 @@ const openProductDetails = (card) => {
     const product = getProductData(card);
     document.querySelector('#product-modal-title').textContent = product.name;
     modalImage.hidden = !card.dataset.image;
+    modalImage.removeAttribute('src');
     if (card.dataset.image) {
-        modalImage.src = card.dataset.image;
         modalImage.alt = `${product.name} product image`;
+        modalImage.src = card.dataset.image;
     }
     document.querySelector('#product-modal-price').textContent = formatNaira(product.price);
     document.querySelector('.modal-description').textContent = card.dataset.description || 'A considered Basto Luxury & Wears essential, designed for comfortable everyday wear and easy layering.';

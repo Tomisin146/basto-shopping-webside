@@ -1,0 +1,54 @@
+/* Subtle, fast storefront motion. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .18s; }
+@keyframes basto-fade { from { opacity: 0; } }
+@keyframes basto-rise { from { opacity: 0; } }
+@keyframes basto-drop { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes basto-pop { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+@keyframes basto-press { 40% { transform: scale(.97); } }
+@keyframes basto-bump { 40% { transform: scale(1.25); } }
+
+/* Layout stability: cards reserve the same space as their skeletons. */
+.clothing-image { background-color: #efede9; overflow: hidden; }
+.clothing-details { min-height: 76px; }
+.clothing-details h3, .clothing-details p { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.clothing-details h3 { -webkit-line-clamp: 2; line-clamp: 2; }
+.clothing-details p { -webkit-line-clamp: 2; line-clamp: 2; }
+.skeleton-card::after { background: #ececec; content: ""; display: block; height: 38px; }
+.skeleton-card h3 { margin-top: 0; }
+
+body { animation: basto-fade .25s ease-out; }
+.clothing-card:not(.skeleton-card) { animation: basto-rise .4s cubic-bezier(.2,.7,.2,1) backwards; transition: transform .25s ease, box-shadow .25s ease; }
+.clothing-card:nth-child(2) { animation-delay: 40ms; }
+.clothing-card:nth-child(3) { animation-delay: 80ms; }
+.clothing-card:nth-child(4) { animation-delay: 120ms; }
+.clothing-card:nth-child(5) { animation-delay: 160ms; }
+.clothing-card:nth-child(6) { animation-delay: 200ms; }
+.clothing-card:nth-child(7) { animation-delay: 240ms; }
+.clothing-card:nth-child(8) { animation-delay: 280ms; }
+@media (hover: hover) {
+	.clothing-card:not(.skeleton-card):hover { box-shadow: 0 14px 30px rgba(10,10,10,.10); transform: translateY(-4px); }
+}
+.clothing-image[data-img]::after { background: #efede9; content: ""; inset: 0; pointer-events: none; position: absolute; transition: opacity .4s ease; }
+.clothing-image[data-img].is-loaded::after { opacity: 0; }
+.sold-out-label { z-index: 1; }
+
+.primary-navigation.open { animation: basto-drop .2s ease-out; }
+.search-results-section:not([hidden]) { animation: basto-fade .25s ease-out; }
+.subcategory-navigation button { transition: background .2s, border-color .2s, color .2s, transform .15s; }
+.product-modal:not([hidden]) .product-modal-backdrop { animation: basto-fade .2s ease-out; }
+.product-modal:not([hidden]) .product-modal-panel { animation: basto-pop .24s cubic-bezier(.2,.7,.2,1); }
+.product-image-viewer:not([hidden]) { animation: basto-fade .2s ease-out; }
+.cart-drawer { transition: transform .3s cubic-bezier(.2,.7,.2,1), visibility 0s linear .3s; visibility: hidden; }
+.cart-drawer.open { transition-delay: 0s; visibility: visible; }
+.cart-backdrop { transition: opacity .3s ease; }
+.cart-count.bump { animation: basto-bump .3s ease; display: inline-block; }
+
+.button, .view-more-button, .hero-link, .add-to-cart, .catalog-show-more, .icon-button, .modal-add { transition: background .2s, color .2s, border-color .2s, transform .15s, box-shadow .2s; }
+.button:active, .view-more-button:active, .hero-link:active, .add-to-cart:active, .catalog-show-more:active, .icon-button:active, .modal-add:active, .subcategory-navigation button:active { transform: scale(.97); }
+.add-to-cart.added { animation: basto-press .3s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+	html { scroll-behavior: auto; }
+	*, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .01ms !important; transition-delay: 0s !important; }
+}

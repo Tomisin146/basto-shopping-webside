@@ -467,3 +467,11 @@ body { overflow-x: hidden; }
     .coming-soon-mark { font-size: clamp(64px, 20vw, 100px); justify-self: end; }
 }
 
+
+.skeleton-card { cursor: default; pointer-events: none; }
+.skeleton-card .clothing-image, .skeleton-card h3, .skeleton-card p { animation: basto-skeleton 1.4s ease-in-out infinite; background: #ececec; }
+.skeleton-card h3 { height: 14px; margin: 14px 0 8px; width: 70%; }
+.skeleton-card p { height: 10px; width: 45%; }
+@keyframes basto-skeleton { 50% { opacity: .45; } }
+
+#home > .hero[hidden], #home > section[hidden], #home > #catalog-sections[hidden] { display: none !important; }

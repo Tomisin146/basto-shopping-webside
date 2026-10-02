@@ -47,10 +47,13 @@ try {
 const whatsappNumber = '2347072305794';
 let selectedProduct = null;
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString('en-NG')}`;
-document.querySelector('#tops .clothing-grid')?.insertAdjacentHTML('beforeend', '<p class="catalog-empty" role="status">Loading products...</p>');
+const skeletonCards = (count = 6) => '<article class="clothing-card skeleton-card" aria-hidden="true"><div class="clothing-image"></div><div class="clothing-details"><div><h3></h3><p></p></div></div></article>'.repeat(count);
+const homeNewArrivalsGridLoading = document.querySelector('#home-new-arrivals .clothing-grid');
+if (homeNewArrivalsGridLoading) homeNewArrivalsGridLoading.innerHTML = skeletonCards(4);
+document.querySelector('#tops .clothing-grid')?.insertAdjacentHTML('beforeend', skeletonCards(6));
 const topsCatalogCount = document.querySelector('#tops .catalog-count');
 if (topsCatalogCount) topsCatalogCount.textContent = 'Loading...';
-document.querySelector('#catalog-sections')?.insertAdjacentHTML('beforeend', '<p class="catalog-empty" role="status">Loading products...</p>');
+document.querySelector('#catalog-sections')?.insertAdjacentHTML('beforeend', `<div class="clothing-grid">${skeletonCards(6)}</div>`);
 const getInventory = () => {
 	try {
 		const inventory = JSON.parse(localStorage.getItem(inventoryStorageKey) || '[]');
@@ -67,7 +70,8 @@ let inventoryLoadFailed = false;
 try {
 	adminInventory = window.bastoInventoryApi?.configured
 		? await window.bastoInventoryApi.listProducts()
-		: getInventory();
+		: [];
+	if (!window.bastoInventoryApi?.configured) inventoryLoadFailed = true;
 } catch (error) {
 	console.error('Could not load shared inventory.', error);
 	inventoryLoadFailed = true;
@@ -76,6 +80,7 @@ const emptyCatalogMessage = inventoryLoadFailed
 	? '<p class="catalog-empty">The catalog is temporarily unavailable. Please try again later.</p>'
 	: '<p class="catalog-empty">No items available in this category yet.</p>';
 const maxHomeProducts = 20;
+const maxHomeTopsProducts = 15;
 const shuffleProducts = (products) => {
 	const shuffled = [...products];
 	for (let index = shuffled.length - 1; index > 0; index -= 1) {
@@ -99,7 +104,7 @@ let bindProductCards = () => {};
 const renderHomeCategory = (state, reset = false) => {
 	if (reset) {
 		state.renderedCount = 0;
-		state.visibleCount = maxHomeProducts;
+		state.visibleCount = state.pageSize || maxHomeProducts;
 		state.grid.replaceChildren();
 	}
 	const products = state.products
@@ -126,7 +131,7 @@ const renderHomeCategory = (state, reset = false) => {
 	}).join(''));
 	state.renderedCount += batch.length;
 	bindProductCards(state.grid);
-	state.showMore.hidden = state.renderedCount >= products.length;
+	state.showMore.hidden = state.categoryId === 'tops' || state.renderedCount >= products.length;
 	state.showMore.textContent = `Show More (${products.length - state.renderedCount})`;
 };
 document.querySelector('.new-arrivals .product-grid')?.replaceChildren();
@@ -205,7 +210,7 @@ const supportedSizesFor = (item) => {
 
 const homeNewArrivalsSection = document.querySelector('#home-new-arrivals');
 if (homeNewArrivalsSection) {
-	const newestProducts = adminInventory.filter((item) => item.is_new_arrival === true).slice(0, 6).map((item) => ({
+	const newestProducts = adminInventory.filter((item) => item.is_new_arrival === true).map((item) => ({
 		id: item.id,
 		name: item.name,
 		category: item.category,
@@ -245,7 +250,6 @@ if (catalogSections) {
 				subcategory: item.subcategory || '',
 				sizes: supportedSizesFor(item),
 			}));
-		if (category.id === 'pants') adminProducts = shuffleProducts(adminProducts);
 		const section = document.createElement('section');
 		section.className = 'clothing-section catalog-section';
 		section.id = category.id;
@@ -291,11 +295,11 @@ if (topsSection) {
 	showMore.hidden = true;
 	showMore.textContent = 'Show More';
 	grid.after(showMore);
-	const state = { categoryId: 'tops', products: adminTops, grid, showMore, activeSubcategory: '', renderedCount: 0, visibleCount: maxHomeProducts };
+	const state = { categoryId: 'tops', products: adminTops, grid, showMore, activeSubcategory: '', renderedCount: 0, pageSize: maxHomeTopsProducts, visibleCount: maxHomeTopsProducts };
 	homeCategoryStates.set('tops', state);
 	renderHomeCategory(state, true);
 	const topsViewMore = topsSection.querySelector('.view-more-button');
-	if (topsViewMore) topsViewMore.hidden = adminTops.length <= maxHomeProducts;
+	if (topsViewMore) topsViewMore.hidden = adminTops.length <= maxHomeTopsProducts;
 }
 
 const normalizeImageValue = (value) => String(value || '').replace(/^url\(["']?(.*?)['"]?\)$/, '$1');
@@ -468,9 +472,10 @@ const wireProductCard = (card) => {
 		modalTitle.textContent = card.querySelector('h3').textContent;
 		const imageSource = getCardData(card).image;
 		modalImage.hidden = !imageSource;
+		modalImage.removeAttribute('src');
 		if (imageSource) {
-			modalImage.src = imageSource;
 			modalImage.alt = `${modalTitle.textContent} product image`;
+			modalImage.src = imageSource;
 		}
 		modalPrice.textContent = card.querySelector('.clothing-details strong').textContent;
 		modalDescription.textContent = card.dataset.description || 'A considered Basto essential, designed for comfortable everyday wear and easy layering.';
@@ -777,7 +782,8 @@ if (searchInput) {
 	searchResultsSection.innerHTML = '<div class="section-heading"><div><p class="eyebrow">Search</p><h2>Results</h2></div><span class="catalog-count"></span></div><div class="clothing-grid search-results-grid"></div>';
 	storefrontMain.querySelector('.hero').after(searchResultsSection);
 	const searchResultsGrid = searchResultsSection.querySelector('.search-results-grid');
-	const normalMainVisibility = new Map([...storefrontMain.children].filter((child) => child !== searchResultsSection).map((child) => [child, child.hidden]));
+	const normalMainVisibility = new Map([...storefrontMain.children].filter((child) => child !== searchResultsSection && child.matches('.hero, section, #catalog-sections')).map((child) => [child, child.hidden]));
+	const categoryLabels = { pants: 'trousers pants', 'watch-accessories': 'watch accessories', tops: 'tops', shoes: 'shoes', cap: 'cap caps', cosmetics: 'cosmetics', undies: 'undies' };
 	const searchableProducts = adminInventory.map((item) => ({
 		id: item.id,
 		name: item.name,
@@ -791,9 +797,9 @@ if (searchInput) {
 		description: item.description,
 		subcategory: item.subcategory || '',
 		sizes: supportedSizesFor(item),
-		searchText: `${item.name} ${item.description || ''} ${item.category} ${item.category === 'pants' ? 'Trousers' : ''} ${item.subcategory || ''} ${(item.sizes || []).join(' ')}`.toLowerCase()
+		searchText: `${item.name} ${item.description || ''} ${item.category} ${categoryLabels[item.category] || ''} ${item.subcategory || ''}`.toLowerCase()
 	}));
-	searchInput.addEventListener('input', () => {
+	const runSearch = () => {
 		const query = searchInput.value.trim().toLowerCase();
 		if (!query) {
 			searchResultsSection.hidden = true;
@@ -802,16 +808,19 @@ if (searchInput) {
 		}
 		normalMainVisibility.forEach((wasHidden, element) => { element.hidden = true; });
 		searchResultsSection.hidden = false;
-		const matches = searchableProducts.filter((product) => product.searchText.includes(query));
+		const terms = query.split(/\s+/);
+		const matches = searchableProducts.filter((product) => terms.every((term) => product.searchText.includes(term)));
 		searchResultsSection.querySelector('h2').textContent = `Results for “${searchInput.value.trim()}”`;
 		searchResultsGrid.replaceChildren();
 		if (!matches.length) {
-			searchResultsGrid.innerHTML = '<p class="catalog-empty" role="status">No products found.</p>';
+			searchResultsGrid.innerHTML = '<p class="catalog-empty" role="status">No products found</p>';
 			return;
 		}
 		searchResultsGrid.insertAdjacentHTML('beforeend', matches.map(renderProductCard).join(''));
 		bindProductCards(searchResultsGrid);
-	});
+	};
+	searchInput.addEventListener('input', runSearch);
+	if (searchInput.value.trim()) runSearch();
 }
 
 if (searchBar) {
