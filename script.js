@@ -758,6 +758,7 @@ if (checkoutForm) {
 				: `Delivery address: ${customer.address}`;
 			const message = `Hello Basto Luxury & Wears, I have placed order ${orderReference}.\n\n${orderType}\n\n${orderLines.join('\n')}\n\nTotal: ${formatNaira(total)}\nPayment method: ${checkoutPaymentMethod.value}\nReceipt uploaded with the order.\n\n${checkoutPaymentInstruction.textContent}\n\nCustomer: ${customer.name}\nPhone: ${customer.phone}\n${fulfillmentDetails}\n\nPlease confirm payment. Thank you.`;
 			sessionStorage.setItem('bastoCheckoutPending', 'true');
+			fetch('/api/order-receipt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: orderReference }), keepalive: true }).catch(() => {});
 			clearCart();
 			window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 		} catch (error) {
