@@ -210,7 +210,12 @@ const supportedSizesFor = (item) => {
 
 const homeNewArrivalsSection = document.querySelector('#home-new-arrivals');
 if (homeNewArrivalsSection) {
-	const newestProducts = adminInventory.filter((item) => item.is_new_arrival === true).map((item) => ({
+	const shuffled = adminInventory.filter((item) => item.is_new_arrival === true);
+	for (let i = shuffled.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+	}
+	const newestProducts = shuffled.map((item) => ({
 		id: item.id,
 		name: item.name,
 		category: item.category,
@@ -506,7 +511,8 @@ const wireProductCard = (card) => {
 	};
 
 	card.addEventListener('click', (event) => {
-		if (!event.target.closest('.add-to-cart, .clothing-image')) openProductDetails();
+		const onImage = event.target.closest('.clothing-image');
+		if (!event.target.closest('.add-to-cart') && (!onImage || card.closest('.search-results-grid'))) openProductDetails();
 	});
 	card.addEventListener('keydown', (event) => {
 		if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('.add-to-cart')) {
